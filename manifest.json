@@ -1,0 +1,28 @@
+{
+  "manifest_version": 2,
+  "name": "FullPage Capture",
+  "version": "0.1.0",
+  "description": "Full-page screenshot to clipboard. No tracking, no servers.",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "<all_urls>",
+    "clipboardWrite"
+  ],
+  "background": {
+    "scripts": ["background/background.js"],
+    "persistent": false
+  },
+  "browser_action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Capture Full Page"
+  },
+  "commands": {
+    "capture-full-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+1"
+      },
+      "description": "Capture full page to clipboard"
+    }
+  }
+}

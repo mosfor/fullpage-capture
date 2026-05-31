@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 200px;
+      padding: 14px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      margin: 0;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      background: #4A90D9;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #357ABD; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .status {
+      margin-top: 10px;
+      text-align: center;
+      min-height: 18px;
+    }
+    .success { color: #2d7d46; }
+    .error { color: #d32f2f; }
+    .hint {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 11px;
+      color: #888;
+    }
+    kbd {
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+  <button id="captureBtn">Capture Full Page</button>
+  <div class="status" id="status"></div>
+  <div class="hint"><kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>1</kbd></div>
+  <script src="popup.js"></script>
+</body>
+</html>
