@@ -26,6 +26,15 @@
       "48": "icons/icon48.png"
     }
   },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "fullpage-capture@mosfor",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": false
+      }
+    }
+  },
   "commands": {
     "capture-full-page": {
       "suggested_key": {
