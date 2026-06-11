@@ -351,7 +351,9 @@
     scroll(0, 0);
     await awaitScroll(0, 0);
 
-    // Calculate rows needed to cover the selection vertically
+    // Calculate tiles needed to cover the selection.
+    const startCol = Math.floor(selX / viewportWidth);
+    const endCol = Math.ceil((selX + selW) / viewportWidth);
     const startRow = Math.floor(selY / viewportHeight);
     const endRow = Math.ceil((selY + selH) / viewportHeight);
     let headersHidden = false;
@@ -364,72 +366,72 @@
           headersHidden = true;
         }
 
-        const idealY = row * viewportHeight;
-        const clampedY = Math.min(
-          idealY,
-          Math.max(0, fullHeight - viewportHeight),
-        );
+        for (let col = startCol; col < endCol; col++) {
+          const idealX = col * viewportWidth;
+          const idealY = row * viewportHeight;
+          const clampedX = Math.min(
+            idealX,
+            Math.max(0, fullWidth - viewportWidth),
+          );
+          const clampedY = Math.min(
+            idealY,
+            Math.max(0, fullHeight - viewportHeight),
+          );
 
-        // We also need to handle horizontal scroll for the selection
-        const idealX = selX;
-        const clampedX = Math.min(
-          idealX,
-          Math.max(0, fullWidth - viewportWidth),
-        );
+          scroll(clampedX, clampedY);
+          await awaitScroll(clampedX, clampedY);
+          await sleep(400);
 
-        scroll(clampedX, clampedY);
-        await awaitScroll(clampedX, clampedY);
-        await sleep(400);
+          const res = await browser.runtime.sendMessage({
+            action: "captureVisibleTab",
+            windowId,
+          });
+          if (!res.success) throw new Error(res.error);
 
-        const res = await browser.runtime.sendMessage({
-          action: "captureVisibleTab",
-          windowId,
-        });
-        if (!res.success) throw new Error(res.error);
+          const img = await loadImage(res.dataUrl);
+          const viewportRect = getScrollViewportRect();
 
-        const img = await loadImage(res.dataUrl);
+          // What portion of the scroll viewport overlaps with our selection?
+          const vpLeft = clampedX;
+          const vpTop = clampedY;
+          const vpRight = clampedX + viewportWidth;
+          const vpBottom = clampedY + viewportHeight;
 
-        // What portion of the viewport overlaps with our selection?
-        const vpLeft = clampedX;
-        const vpTop = clampedY;
-        const vpRight = clampedX + viewportWidth;
-        const vpBottom = clampedY + viewportHeight;
+          const overlapLeft = Math.max(selX, vpLeft);
+          const overlapTop = Math.max(selY, vpTop);
+          const overlapRight = Math.min(selX + selW, vpRight);
+          const overlapBottom = Math.min(selY + selH, vpBottom);
 
-        const overlapLeft = Math.max(selX, vpLeft);
-        const overlapTop = Math.max(selY, vpTop);
-        const overlapRight = Math.min(selX + selW, vpRight);
-        const overlapBottom = Math.min(selY + selH, vpBottom);
+          const overlapW = overlapRight - overlapLeft;
+          const overlapH = overlapBottom - overlapTop;
 
-        const overlapW = overlapRight - overlapLeft;
-        const overlapH = overlapBottom - overlapTop;
+          if (overlapW <= 0 || overlapH <= 0) continue;
 
-        if (overlapW <= 0 || overlapH <= 0) continue;
+          // Source position within the captured window image.
+          const imgSrcX = (viewportRect.left + overlapLeft - vpLeft) * dpr;
+          const imgSrcY = (viewportRect.top + overlapTop - vpTop) * dpr;
 
-        // Source position within the captured image
-        const imgSrcX = (overlapLeft - vpLeft) * dpr;
-        const imgSrcY = (overlapTop - vpTop) * dpr;
+          // Destination on our canvas
+          const destX = (overlapLeft - selX) * dpr;
+          const destY = (overlapTop - selY) * dpr;
 
-        // Destination on our canvas
-        const destX = (overlapLeft - selX) * dpr;
-        const destY = (overlapTop - selY) * dpr;
-
-        ctx.drawImage(
-          img,
-          imgSrcX,
-          imgSrcY,
-          overlapW * dpr,
-          overlapH * dpr,
-          destX,
-          destY,
-          overlapW * dpr,
-          overlapH * dpr,
-        );
+          ctx.drawImage(
+            img,
+            imgSrcX,
+            imgSrcY,
+            overlapW * dpr,
+            overlapH * dpr,
+            destX,
+            destY,
+            overlapW * dpr,
+            overlapH * dpr,
+          );
+        }
       }
     } finally {
       if (headersHidden) restoreFixed();
+      scroll(origX, origY);
     }
-
-    scroll(origX, origY);
     return canvas.toDataURL("image/png");
   }
 
@@ -544,14 +546,19 @@
 
       function toPageCoords(clientX, clientY) {
         const s = getCurScroll();
-        return { x: clientX + s.x, y: clientY + s.y };
+        const viewportRect = getScrollViewportRect();
+        return {
+          x: clientX - viewportRect.left + s.x,
+          y: clientY - viewportRect.top + s.y,
+        };
       }
 
       function updateBox() {
         if (!selRect) return;
         const s = getCurScroll();
-        box.style.left = selRect.x - s.x + "px";
-        box.style.top = selRect.y - s.y + "px";
+        const viewportRect = getScrollViewportRect();
+        box.style.left = viewportRect.left + selRect.x - s.x + "px";
+        box.style.top = viewportRect.top + selRect.y - s.y + "px";
         box.style.width = selRect.width + "px";
         box.style.height = selRect.height + "px";
         box.style.display = "block";
@@ -595,8 +602,9 @@
       function updateHandles() {
         if (!selRect) return;
         const s = getCurScroll();
-        const vx = selRect.x - s.x;
-        const vy = selRect.y - s.y;
+        const viewportRect = getScrollViewportRect();
+        const vx = viewportRect.left + selRect.x - s.x;
+        const vy = viewportRect.top + selRect.y - s.y;
         const w = selRect.width;
         const h = selRect.height;
         const half = 5;
@@ -930,6 +938,13 @@
     const el = getScrollContainer();
     if (el) return { x: el.scrollLeft, y: el.scrollTop };
     return { x: window.scrollX, y: window.scrollY };
+  }
+
+  function getScrollViewportRect() {
+    const el = getScrollContainer();
+    if (!el) return { left: 0, top: 0 };
+    const rect = el.getBoundingClientRect();
+    return { left: rect.left, top: rect.top };
   }
 
   function awaitScroll(targetX, targetY) {
