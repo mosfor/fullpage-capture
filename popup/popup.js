@@ -7,6 +7,15 @@ const scrollRegionBtn = document.getElementById("scrollRegionBtn");
 const outputMode = document.getElementById("outputMode");
 const status = document.getElementById("status");
 
+const CONTENT_SCRIPTS = [
+  "/content/utils.js",
+  "/content/scroll.js",
+  "/content/fixed-elements.js",
+  "/content/selection.js",
+  "/content/capture.js",
+  "/content/content.js",
+];
+
 // Restore saved output preference
 browser.storage.local.get("outputMode").then((data) => {
   if (data.outputMode) outputMode.value = data.outputMode;
@@ -36,7 +45,7 @@ async function triggerCapture(mode) {
     if (restricted) throw new Error("Cannot capture this page");
 
     try {
-      await browser.tabs.executeScript(tab.id, { file: "/content/content.js" });
+      await injectContentScripts(tab.id);
     } catch (e) {
       throw new Error("Cannot access this page");
     }
@@ -60,6 +69,12 @@ async function triggerCapture(mode) {
     status.className = "status error";
   } finally {
     enableAll();
+  }
+}
+
+async function injectContentScripts(tabId) {
+  for (const file of CONTENT_SCRIPTS) {
+    await browser.tabs.executeScript(tabId, { file });
   }
 }
 
