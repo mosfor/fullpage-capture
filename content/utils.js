@@ -24,7 +24,8 @@
       Object.assign(el.style, {
         position: "fixed",
         top: "16px",
-        right: "16px",
+        left: "50%",
+        transform: "translateX(-50%)",
         zIndex: "2147483647",
         padding: "8px 16px",
         borderRadius: "6px",
@@ -36,6 +37,12 @@
       });
       document.body.appendChild(el);
     }
+    Object.assign(el.style, {
+      top: "16px",
+      left: "50%",
+      right: "auto",
+      transform: "translateX(-50%)",
+    });
     el.style.background = text.startsWith("✗") ? "#d32f2f" : "#2d7d46";
     el.textContent = text;
     el.style.opacity = "1";
