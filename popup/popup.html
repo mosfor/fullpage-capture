@@ -4,11 +4,16 @@
   <meta charset="utf-8">
   <style>
     body {
-      width: 200px;
+      width: 220px;
       padding: 14px;
       font-family: system-ui, sans-serif;
       font-size: 13px;
       margin: 0;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
     button {
       width: 100%;
@@ -20,9 +25,21 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
+      text-align: left;
     }
     button:hover { background: #357ABD; }
     button:disabled { background: #ccc; cursor: not-allowed; }
+    button .shortcut {
+      float: right;
+      font-weight: 400;
+      opacity: 0.7;
+      font-size: 11px;
+    }
+    .secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+    .secondary:hover { background: #e0e0e0; }
     .status {
       margin-top: 10px;
       text-align: center;
@@ -30,25 +47,41 @@
     }
     .success { color: #2d7d46; }
     .error { color: #d32f2f; }
-    .hint {
-      margin-top: 10px;
-      text-align: center;
-      font-size: 11px;
-      color: #888;
+    hr {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 8px 0;
     }
-    kbd {
-      background: #f0f0f0;
+    .option-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #555;
+      margin-top: 8px;
+    }
+    .option-row select {
+      font-size: 11px;
+      padding: 2px 4px;
+      border-radius: 4px;
       border: 1px solid #ccc;
-      border-radius: 3px;
-      padding: 1px 5px;
-      font-size: 10px;
     }
   </style>
 </head>
 <body>
-  <button id="captureBtn">Capture Full Page</button>
+  <div class="actions">
+    <button id="fullPageBtn">Full Page <span class="shortcut">Alt+Shift+1</span></button>
+    <button id="viewportBtn" class="secondary">Visible Area <span class="shortcut">Alt+Shift+2</span></button>
+    <button id="regionBtn" class="secondary">Select Region <span class="shortcut">Alt+Shift+3</span></button>
+  </div>
+  <div class="option-row">
+    <span>Output</span>
+    <select id="outputMode">
+      <option value="clipboard">Clipboard</option>
+      <option value="file">Save file</option>
+    </select>
+  </div>
   <div class="status" id="status"></div>
-  <div class="hint"><kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>1</kbd></div>
   <script src="popup.js"></script>
 </body>
 </html>

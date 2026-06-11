@@ -1,33 +1,39 @@
 # FullPage Capture
 
-Minimal Firefox/Zen browser extension that captures a full-page screenshot and copies it to your clipboard as PNG.
+Minimal Firefox/Zen browser extension that captures screenshots and copies them to your clipboard as PNG.
 
 ## Features
 
 - **Full-page capture** — auto-scrolls and stitches the entire page
+- **Visible area capture** — grab exactly what's on screen
+- **Region selection** — draw a rectangle to capture any area
 - **Scroll container detection** — works on pages with inner scrollable areas (dashboards, SPAs)
 - **Sticky/fixed element handling** — hides fixed headers after the first frame to prevent duplication
-- **Clipboard-first** — result goes straight to clipboard, no file dialogs
-- **Keyboard shortcut** — `Alt+Shift+1` (configurable in `about:addons` → Manage Extension Shortcuts)
-- **Zero dependencies** — pure browser APIs, no external libraries
+- **Clipboard or file** — output to clipboard or save as PNG file
+- **Keyboard shortcuts** — all configurable via `about:addons`
 
 ## Install
 
-### From source (temporary)
+### Firefox Add-ons (AMO)
+
+[Install from AMO](https://addons.mozilla.org/firefox/addon/fullpage-capture/)
+
+### From source
 
 1. Clone this repo
-2. Open `about:debugging#/runtime/this-firefox` in Firefox/Zen
+2. Open `about:debugging#/runtime/this-firefox`
 3. Click "Load Temporary Add-on"
 4. Select `manifest.json`
 
-### From AMO (coming soon)
+## Shortcuts
 
-## Usage
+| Action | Default | 
+|--------|---------|
+| Full page | `Alt+Shift+1` |
+| Visible area | `Alt+Shift+2` |
+| Select region | `Alt+Shift+3` |
 
-1. Navigate to any page
-2. Click the extension icon or press `Alt+Shift+1`
-3. Wait for capture to complete
-4. Paste anywhere — the PNG is in your clipboard
+Customize in `about:addons` → gear icon → "Manage Extension Shortcuts"
 
 ## How it works
 
@@ -36,7 +42,7 @@ Minimal Firefox/Zen browser extension that captures a full-page screenshot and c
 3. Scrolls through the page in viewport-sized steps
 4. Captures each viewport via `browser.tabs.captureVisibleTab()`
 5. Stitches all captures on a canvas
-6. Copies the final PNG to clipboard
+6. Copies PNG to clipboard or triggers download
 
 ## Permissions
 
@@ -46,6 +52,8 @@ Minimal Firefox/Zen browser extension that captures a full-page screenshot and c
 | `tabs` | Query active tab info |
 | `<all_urls>` | Inject content script on any page |
 | `clipboardWrite` | Copy screenshot to clipboard |
+| `downloads` | Save screenshot as file |
+| `storage` | Remember output preference |
 
 ## Limitations
 

@@ -1,5 +1,5 @@
 // FullPage Capture - Content Script
-// Handles: scrolling, capturing grid, stitching, clipboard copy
+// Handles: scrolling, capturing, stitching, region selection, clipboard/download
 
 (() => {
   if (window._fullPageCaptureInjected) return;
@@ -12,6 +12,8 @@
 
   browser.runtime.onMessage.addListener((request) => {
     switch (request.action) {
+      case "triggerCapture":
+        return capture(request.mode, request.output, request.windowId);
       case "getPageDimensions":
         return Promise.resolve(getPageDimensions());
       case "scrollToPosition":
@@ -25,108 +27,272 @@
       case "restoreFixedElements":
         restoreFixed();
         return Promise.resolve({ success: true });
-      case "triggerCapture":
-        return capture(request.windowId);
-      case "copyToClipboard":
-        return copyToClipboard(request.dataUrl);
     }
   });
 
-  // --- Main capture logic ---
+  // --- Main capture dispatcher ---
 
-  async function capture(windowId) {
+  async function capture(mode, output, windowId) {
     try {
-      const dims = getPageDimensions();
-      const { fullWidth, fullHeight, viewportWidth, viewportHeight } = dims;
-      const origX = dims.scrollX;
-      const origY = dims.scrollY;
+      let dataUrl;
 
-      // Single viewport — no scrolling needed
-      if (fullHeight <= viewportHeight && fullWidth <= viewportWidth) {
-        const res = await captureViewport(windowId);
-        await copyToClipboard(res.dataUrl);
-        notify("✓");
-        return { success: true };
+      switch (mode) {
+        case "fullPage":
+          dataUrl = await captureFullPage(windowId);
+          break;
+        case "viewport":
+          dataUrl = await captureViewport(windowId);
+          break;
+        case "region":
+          dataUrl = await captureRegion(windowId);
+          break;
+        default:
+          throw new Error("Unknown capture mode");
       }
 
-      scroll(0, 0);
-      await awaitScroll(0, 0);
-
-      // Find headers to hide after first row
-      const headers = findFixedElements()
-        .filter((el) => el.isHeader)
-        .map((el) => el.selector);
-
-      const cols = Math.ceil(fullWidth / viewportWidth);
-      const rows = Math.ceil(fullHeight / viewportHeight);
-      const canvas = document.createElement("canvas");
-      canvas.width = fullWidth;
-      canvas.height = fullHeight;
-      const ctx = canvas.getContext("2d");
-
-      let headersHidden = false;
-
-      try {
-        for (let row = 0; row < rows; row++) {
-          // Hide sticky headers after first row to prevent duplication
-          if (row === 1 && headers.length > 0 && !headersHidden) {
-            hideFixed(headers);
-            headersHidden = true;
-          }
-
-          for (let col = 0; col < cols; col++) {
-            const idealX = col * viewportWidth;
-            const idealY = row * viewportHeight;
-            const clampedX = Math.min(idealX, Math.max(0, fullWidth - viewportWidth));
-            const clampedY = Math.min(idealY, Math.max(0, fullHeight - viewportHeight));
-
-            scroll(clampedX, clampedY);
-            await awaitScroll(clampedX, clampedY);
-            await sleep(400);
-
-            const res = await captureViewport(windowId);
-            const img = await loadImage(res.dataUrl);
-
-            // Calculate source offset for edge tiles where scroll was clamped
-            const srcX = idealX - clampedX;
-            const srcY = idealY - clampedY;
-            const drawW = Math.min(viewportWidth - srcX, fullWidth - idealX);
-            const drawH = Math.min(viewportHeight - srcY, fullHeight - idealY);
-
-            if (drawW > 0 && drawH > 0) {
-              ctx.drawImage(img, srcX, srcY, drawW, drawH, idealX, idealY, drawW, drawH);
-            }
-          }
-        }
-      } finally {
-        if (headersHidden) restoreFixed();
-      }
-
-      scroll(origX, origY);
-
-      const blob = await new Promise((r) => canvas.toBlob(r, "image/png"));
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      await outputResult(dataUrl, output);
       notify("✓");
       return { success: true };
     } catch (e) {
+      if (e.message === "cancelled") return { success: true };
       notify("✗ " + e.message);
       return { success: false, error: e.message };
     }
   }
 
-  // --- Viewport capture (delegates to background) ---
+  // --- Viewport capture ---
 
-  function captureViewport(windowId) {
-    return browser.runtime.sendMessage({ action: "captureVisibleTab", windowId });
+  async function captureViewport(windowId) {
+    const res = await browser.runtime.sendMessage({ action: "captureVisibleTab", windowId });
+    if (!res.success) throw new Error(res.error);
+    return res.dataUrl;
   }
 
-  // --- Clipboard ---
+  // --- Full page capture ---
 
-  async function copyToClipboard(dataUrl) {
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-    return { success: true };
+  async function captureFullPage(windowId) {
+    const dims = getPageDimensions();
+    const { fullWidth, fullHeight, viewportWidth, viewportHeight } = dims;
+    const origX = dims.scrollX;
+    const origY = dims.scrollY;
+
+    // No scroll needed
+    if (fullHeight <= viewportHeight && fullWidth <= viewportWidth) {
+      return captureViewport(windowId);
+    }
+
+    scroll(0, 0);
+    await awaitScroll(0, 0);
+
+    const headers = findFixedElements()
+      .filter((el) => el.isHeader)
+      .map((el) => el.selector);
+
+    const cols = Math.ceil(fullWidth / viewportWidth);
+    const rows = Math.ceil(fullHeight / viewportHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = fullWidth;
+    canvas.height = fullHeight;
+    const ctx = canvas.getContext("2d");
+
+    let headersHidden = false;
+
+    try {
+      for (let row = 0; row < rows; row++) {
+        if (row === 1 && headers.length > 0 && !headersHidden) {
+          hideFixed(headers);
+          headersHidden = true;
+        }
+
+        for (let col = 0; col < cols; col++) {
+          const idealX = col * viewportWidth;
+          const idealY = row * viewportHeight;
+          const clampedX = Math.min(idealX, Math.max(0, fullWidth - viewportWidth));
+          const clampedY = Math.min(idealY, Math.max(0, fullHeight - viewportHeight));
+
+          scroll(clampedX, clampedY);
+          await awaitScroll(clampedX, clampedY);
+          await sleep(400);
+
+          const res = await browser.runtime.sendMessage({ action: "captureVisibleTab", windowId });
+          if (!res.success) throw new Error(res.error);
+
+          const img = await loadImage(res.dataUrl);
+          const srcX = idealX - clampedX;
+          const srcY = idealY - clampedY;
+          const drawW = Math.min(viewportWidth - srcX, fullWidth - idealX);
+          const drawH = Math.min(viewportHeight - srcY, fullHeight - idealY);
+
+          if (drawW > 0 && drawH > 0) {
+            ctx.drawImage(img, srcX, srcY, drawW, drawH, idealX, idealY, drawW, drawH);
+          }
+        }
+      }
+    } finally {
+      if (headersHidden) restoreFixed();
+    }
+
+    scroll(origX, origY);
+    return canvas.toDataURL("image/png");
+  }
+
+  // --- Region selection ---
+
+  async function captureRegion(windowId) {
+    const rect = await selectRegion();
+    if (!rect) throw new Error("cancelled");
+
+    // Small delay for overlay to disappear
+    await sleep(50);
+
+    // Capture the viewport
+    const res = await browser.runtime.sendMessage({ action: "captureVisibleTab", windowId });
+    if (!res.success) throw new Error(res.error);
+
+    // Crop to selected region
+    const dpr = window.devicePixelRatio || 1;
+    const img = await loadImage(res.dataUrl);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext("2d");
+
+    ctx.drawImage(
+      img,
+      rect.x * dpr, rect.y * dpr, rect.width * dpr, rect.height * dpr,
+      0, 0, rect.width * dpr, rect.height * dpr
+    );
+
+    return canvas.toDataURL("image/png");
+  }
+
+  function selectRegion() {
+    return new Promise((resolve) => {
+      // Create overlay
+      const overlay = document.createElement("div");
+      Object.assign(overlay.style, {
+        position: "fixed",
+        top: "0",
+        left: "0",
+        width: "100%",
+        height: "100%",
+        zIndex: "2147483647",
+        cursor: "crosshair",
+        background: "rgba(0,0,0,0.1)",
+      });
+
+      // Selection box
+      const box = document.createElement("div");
+      Object.assign(box.style, {
+        position: "fixed",
+        border: "2px solid #4A90D9",
+        background: "rgba(74,144,217,0.1)",
+        display: "none",
+        zIndex: "2147483647",
+        pointerEvents: "none",
+      });
+
+      // Instructions
+      const hint = document.createElement("div");
+      Object.assign(hint.style, {
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        padding: "12px 20px",
+        borderRadius: "8px",
+        background: "rgba(0,0,0,0.7)",
+        color: "#fff",
+        font: "14px system-ui, sans-serif",
+        pointerEvents: "none",
+        zIndex: "2147483647",
+      });
+      hint.textContent = "Draw a rectangle to capture · Esc to cancel";
+
+      document.body.appendChild(overlay);
+      document.body.appendChild(box);
+      document.body.appendChild(hint);
+
+      let startX, startY, drawing = false;
+
+      function cleanup() {
+        overlay.remove();
+        box.remove();
+        hint.remove();
+        document.removeEventListener("keydown", onKey);
+      }
+
+      function onKey(e) {
+        if (e.key === "Escape") {
+          cleanup();
+          resolve(null);
+        }
+      }
+
+      document.addEventListener("keydown", onKey);
+
+      overlay.addEventListener("mousedown", (e) => {
+        drawing = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        box.style.display = "block";
+        hint.style.display = "none";
+        box.style.left = startX + "px";
+        box.style.top = startY + "px";
+        box.style.width = "0";
+        box.style.height = "0";
+      });
+
+      overlay.addEventListener("mousemove", (e) => {
+        if (!drawing) return;
+        const x = Math.min(e.clientX, startX);
+        const y = Math.min(e.clientY, startY);
+        const w = Math.abs(e.clientX - startX);
+        const h = Math.abs(e.clientY - startY);
+        box.style.left = x + "px";
+        box.style.top = y + "px";
+        box.style.width = w + "px";
+        box.style.height = h + "px";
+      });
+
+      overlay.addEventListener("mouseup", (e) => {
+        if (!drawing) return;
+        drawing = false;
+
+        const x = Math.min(e.clientX, startX);
+        const y = Math.min(e.clientY, startY);
+        const w = Math.abs(e.clientX - startX);
+        const h = Math.abs(e.clientY - startY);
+
+        cleanup();
+
+        // Minimum selection size
+        if (w < 5 || h < 5) {
+          resolve(null);
+          return;
+        }
+
+        resolve({ x, y, width: w, height: h });
+      });
+    });
+  }
+
+  // --- Output handling ---
+
+  async function outputResult(dataUrl, output) {
+    if (output === "file") {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      await browser.runtime.sendMessage({
+        action: "download",
+        dataUrl,
+        filename: `capture-${timestamp}.png`,
+      });
+    } else {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    }
   }
 
   // --- Scroll container detection ---
@@ -135,7 +301,6 @@
     const html = document.documentElement;
     const body = document.body;
 
-    // Standard body scroll
     if (html.scrollHeight > html.clientHeight + 10) {
       const htmlOF = getComputedStyle(html).overflowY;
       const bodyOF = getComputedStyle(body).overflowY;
@@ -144,7 +309,6 @@
       }
     }
 
-    // Find largest scrollable element (for SPAs/dashboards with overflow containers)
     let best = null;
     let bestArea = 0;
 
