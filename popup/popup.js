@@ -3,6 +3,7 @@
 const fullPageBtn = document.getElementById("fullPageBtn");
 const viewportBtn = document.getElementById("viewportBtn");
 const regionBtn = document.getElementById("regionBtn");
+const scrollRegionBtn = document.getElementById("scrollRegionBtn");
 const outputMode = document.getElementById("outputMode");
 const status = document.getElementById("status");
 
@@ -18,6 +19,7 @@ outputMode.addEventListener("change", () => {
 fullPageBtn.addEventListener("click", () => triggerCapture("fullPage"));
 viewportBtn.addEventListener("click", () => triggerCapture("viewport"));
 regionBtn.addEventListener("click", () => triggerCapture("region"));
+scrollRegionBtn.addEventListener("click", () => triggerCapture("scrollRegion"));
 
 async function triggerCapture(mode) {
   try {
@@ -65,10 +67,12 @@ function disableAll() {
   fullPageBtn.disabled = true;
   viewportBtn.disabled = true;
   regionBtn.disabled = true;
+  scrollRegionBtn.disabled = true;
 }
 
 function enableAll() {
   fullPageBtn.disabled = false;
   viewportBtn.disabled = false;
   regionBtn.disabled = false;
+  scrollRegionBtn.disabled = false;
 }
