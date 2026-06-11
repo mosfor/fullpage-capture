@@ -34,6 +34,7 @@ browser.commands.onCommand.addListener(async (command) => {
     "capture-full-page": "fullPage",
     "capture-viewport": "viewport",
     "capture-region": "region",
+    "capture-scroll-region": "scrollRegion",
   };
 
   const mode = modeMap[command];

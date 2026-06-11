@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "FullPage Capture",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Full-page, viewport, or region screenshot to clipboard or file. No tracking, no servers.",
   "permissions": [
     "activeTab",
@@ -58,6 +58,12 @@
         "default": "Alt+Shift+3"
       },
       "description": "Select region to capture"
+    },
+    "capture-scroll-region": {
+      "suggested_key": {
+        "default": "Alt+Shift+4"
+      },
+      "description": "Scrolling selection capture"
     }
   }
 }
