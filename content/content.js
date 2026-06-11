@@ -283,11 +283,12 @@
   async function outputResult(dataUrl, output) {
     if (output === "file") {
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      await browser.runtime.sendMessage({
+      const dlResult = await browser.runtime.sendMessage({
         action: "download",
         dataUrl,
         filename: `capture-${timestamp}.png`,
       });
+      if (!dlResult.success) throw new Error(dlResult.error || "Download failed");
     } else {
       const res = await fetch(dataUrl);
       const blob = await res.blob();
