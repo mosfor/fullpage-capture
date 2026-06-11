@@ -1,6 +1,21 @@
 // FullPage Capture - Background Script
 // Handles privileged APIs: captureVisibleTab, keyboard commands, downloads
 
+const CONTENT_SCRIPTS = [
+  "/content/utils.js",
+  "/content/scroll.js",
+  "/content/fixed-elements.js",
+  "/content/selection.js",
+  "/content/capture.js",
+  "/content/content.js",
+];
+
+async function injectContentScripts(tabId) {
+  for (const file of CONTENT_SCRIPTS) {
+    await browser.tabs.executeScript(tabId, { file });
+  }
+}
+
 browser.runtime.onMessage.addListener((request) => {
   if (request.action === "captureVisibleTab") {
     return browser.tabs.captureVisibleTab(request.windowId || null, { format: "png" })
@@ -49,7 +64,7 @@ browser.commands.onCommand.addListener(async (command) => {
   if (restricted) return;
 
   try {
-    await browser.tabs.executeScript(tab.id, { file: "/content/content.js" });
+    await injectContentScripts(tab.id);
   } catch (e) {
     return;
   }
