@@ -1,18 +1,43 @@
 // FullPage Capture - Background Script
-// Handles privileged APIs: captureVisibleTab, keyboard commands
+// Handles privileged APIs: captureVisibleTab, keyboard commands, downloads
 
-// Capture the visible viewport (only callable from extension context)
 browser.runtime.onMessage.addListener((request) => {
   if (request.action === "captureVisibleTab") {
     return browser.tabs.captureVisibleTab(request.windowId || null, { format: "png" })
       .then((dataUrl) => ({ success: true, dataUrl }))
       .catch((error) => ({ success: false, error: error.message }));
   }
+
+  if (request.action === "download") {
+    // Convert data URL to blob URL (data URLs can exceed size limits)
+    return fetch(request.dataUrl)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        return browser.downloads.download({
+          url: blobUrl,
+          filename: request.filename,
+          saveAs: true,
+        }).then((id) => {
+          // Clean up blob URL after download starts
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+          return { success: true };
+        });
+      })
+      .catch((error) => ({ success: false, error: error.message }));
+  }
 });
 
-// Keyboard shortcut handler
+// Keyboard shortcut handlers
 browser.commands.onCommand.addListener(async (command) => {
-  if (command !== "capture-full-page") return;
+  const modeMap = {
+    "capture-full-page": "fullPage",
+    "capture-viewport": "viewport",
+    "capture-region": "region",
+  };
+
+  const mode = modeMap[command];
+  if (!mode) return;
 
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab) return;
@@ -28,8 +53,14 @@ browser.commands.onCommand.addListener(async (command) => {
     return;
   }
 
+  // Get saved output preference
+  const data = await browser.storage.local.get("outputMode");
+  const output = data.outputMode || "clipboard";
+
   browser.tabs.sendMessage(tab.id, {
     action: "triggerCapture",
+    mode,
+    output,
     windowId: tab.windowId,
   });
 });
