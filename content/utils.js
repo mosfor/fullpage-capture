@@ -21,35 +21,40 @@
     if (!el) {
       el = document.createElement("div");
       el.id = "_fullpage-capture-notify";
-      Object.assign(el.style, {
-        position: "fixed",
-        top: "20px",
-        left: "50%",
-        transform: "translateX(-50%) scale(0)",
-        zIndex: "2147483647",
-        width: "48px",
-        height: "48px",
-        borderRadius: "50%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow: "0 4px 12px rgba(0,0,0,.15)",
-        transition: "opacity .3s, transform .3s cubic-bezier(0.34,1.56,0.64,1)",
-        pointerEvents: "none",
-        opacity: "0",
-      });
+      el.setAttribute("style", [
+        "position:fixed!important",
+        "top:20px!important",
+        "left:50%!important",
+        "transform:translateX(-50%) scale(0)!important",
+        "z-index:2147483647!important",
+        "width:56px!important",
+        "height:56px!important",
+        "border-radius:50%!important",
+        "display:flex!important",
+        "align-items:center!important",
+        "justify-content:center!important",
+        "box-shadow:0 4px 16px rgba(0,0,0,.2)!important",
+        "transition:opacity .3s,transform .3s cubic-bezier(0.34,1.56,0.64,1)!important",
+        "pointer-events:none!important",
+        "opacity:0!important",
+        "padding:0!important",
+        "margin:0!important",
+        "overflow:hidden!important",
+        "box-sizing:border-box!important",
+        "line-height:1!important",
+      ].join(";"));
       document.body.appendChild(el);
     }
     const isError = text.startsWith("✗");
-    el.style.background = isError ? "#d32f2f" : "#2e7d32";
+    el.style.setProperty("background", isError ? "#d32f2f" : "#2e7d32", "important");
     el.innerHTML = isError
-      ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
-      : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-    el.style.opacity = "1";
-    el.style.transform = "translateX(-50%) scale(1)";
+      ? '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+      : '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    el.style.setProperty("opacity", "1", "important");
+    el.style.setProperty("transform", "translateX(-50%) scale(1)", "important");
     setTimeout(() => {
-      el.style.opacity = "0";
-      el.style.transform = "translateX(-50%) scale(0.8)";
+      el.style.setProperty("opacity", "0", "important");
+      el.style.setProperty("transform", "translateX(-50%) scale(0.8)", "important");
     }, 1500);
   };
 
