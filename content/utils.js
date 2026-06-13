@@ -16,6 +16,37 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   };
 
+  fpc.nextPaint = function nextPaint() {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  };
+
+  fpc.waitForCaptureReady = async function waitForCaptureReady() {
+    await fpc.nextPaint();
+    await fpc.sleep(80);
+  };
+
+  fpc.canvasToPngBlob = function canvasToPngBlob(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Failed to encode screenshot"));
+      }, "image/png");
+    });
+  };
+
+  fpc.blobToDataUrl = function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("Failed to read screenshot"));
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  let notifyTimer = null;
+
   fpc.notify = function notify(text) {
     let el = document.getElementById("_fullpage-capture-notify");
     if (!el) {
@@ -52,13 +83,19 @@
       : '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
     el.style.setProperty("opacity", "1", "important");
     el.style.setProperty("transform", "translateX(-50%) scale(1)", "important");
-    setTimeout(() => {
+    if (notifyTimer) clearTimeout(notifyTimer);
+    notifyTimer = setTimeout(() => {
       el.style.setProperty("opacity", "0", "important");
       el.style.setProperty("transform", "translateX(-50%) scale(0.8)", "important");
+      notifyTimer = null;
     }, 1500);
   };
 
-  fpc.outputResult = async function outputResult(dataUrl, output) {
+  fpc.outputResult = async function outputResult(image, output) {
+    const blob = image instanceof Blob
+      ? image
+      : await fetch(image).then((res) => res.blob());
+
     if (output === "file") {
       const timestamp = new Date()
         .toISOString()
@@ -66,14 +103,12 @@
         .slice(0, 19);
       const dlResult = await browser.runtime.sendMessage({
         action: "download",
-        dataUrl,
+        dataUrl: image instanceof Blob ? await fpc.blobToDataUrl(blob) : image,
         filename: `capture-${timestamp}.png`,
       });
       if (!dlResult.success)
         throw new Error(dlResult.error || "Download failed");
     } else {
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": blob }),
       ]);

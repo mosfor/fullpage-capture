@@ -53,7 +53,7 @@
 
           fpc.scroll(clampedX, clampedY);
           await fpc.awaitScroll(clampedX, clampedY);
-          await fpc.sleep(400);
+          await fpc.waitForCaptureReady();
 
           const res = await browser.runtime.sendMessage({
             action: "captureVisibleTab",
@@ -77,7 +77,7 @@
       fpc.scroll(origX, origY);
     }
 
-    return canvas.toDataURL("image/png");
+    return fpc.canvasToPngBlob(canvas);
   };
 
   fpc.captureRegion = async function captureRegion(windowId) {
@@ -112,7 +112,7 @@
       rect.height * dpr,
     );
 
-    return canvas.toDataURL("image/png");
+    return fpc.canvasToPngBlob(canvas);
   };
 
   fpc.captureScrollRegion = async function captureScrollRegion(windowId) {
@@ -165,7 +165,7 @@
 
           fpc.scroll(clampedX, clampedY);
           await fpc.awaitScroll(clampedX, clampedY);
-          await fpc.sleep(400);
+          await fpc.waitForCaptureReady();
 
           const res = await browser.runtime.sendMessage({
             action: "captureVisibleTab",
@@ -214,6 +214,6 @@
       fpc.scroll(origX, origY);
     }
 
-    return canvas.toDataURL("image/png");
+    return fpc.canvasToPngBlob(canvas);
   };
 })();
