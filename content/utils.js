@@ -16,6 +16,37 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   };
 
+  fpc.nextPaint = function nextPaint() {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  };
+
+  fpc.waitForCaptureReady = async function waitForCaptureReady() {
+    await fpc.nextPaint();
+    await fpc.sleep(80);
+  };
+
+  fpc.canvasToPngBlob = function canvasToPngBlob(canvas) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Failed to encode screenshot"));
+      }, "image/png");
+    });
+  };
+
+  fpc.blobToDataUrl = function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("Failed to read screenshot"));
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  let notifyTimer = null;
+
   fpc.notify = function notify(text) {
     let el = document.getElementById("_fullpage-capture-notify");
     if (!el) {
@@ -46,12 +77,18 @@
     el.style.background = text.startsWith("✗") ? "#d32f2f" : "#2d7d46";
     el.textContent = text;
     el.style.opacity = "1";
-    setTimeout(() => {
+    if (notifyTimer) clearTimeout(notifyTimer);
+    notifyTimer = setTimeout(() => {
       el.style.opacity = "0";
+      notifyTimer = null;
     }, 2000);
   };
 
-  fpc.outputResult = async function outputResult(dataUrl, output) {
+  fpc.outputResult = async function outputResult(image, output) {
+    const blob = image instanceof Blob
+      ? image
+      : await fetch(image).then((res) => res.blob());
+
     if (output === "file") {
       const timestamp = new Date()
         .toISOString()
@@ -59,14 +96,12 @@
         .slice(0, 19);
       const dlResult = await browser.runtime.sendMessage({
         action: "download",
-        dataUrl,
+        dataUrl: image instanceof Blob ? await fpc.blobToDataUrl(blob) : image,
         filename: `capture-${timestamp}.png`,
       });
       if (!dlResult.success)
         throw new Error(dlResult.error || "Download failed");
     } else {
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": blob }),
       ]);

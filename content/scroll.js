@@ -4,35 +4,92 @@
   const fpc = (window.FullPageCapture ||= {});
   let scrollContainer;
 
+  const LIKELY_SCROLL_SELECTOR = [
+    "main",
+    "[role='main']",
+    "[class*='scroll' i]",
+    "[class*='scroller' i]",
+    "[class*='scrollable' i]",
+    "[class*='content' i]",
+    "[class*='viewport' i]",
+    "[id*='scroll' i]",
+    "[id*='content' i]",
+    "[id*='viewport' i]",
+  ].join(",");
+
+  function isScrollable(el) {
+    if (!el || el === document.documentElement || el === document.body) return false;
+    if (el.scrollHeight <= el.clientHeight + 10 && el.scrollWidth <= el.clientWidth + 10) return false;
+
+    const style = getComputedStyle(el);
+    const canY = (style.overflowY === "auto" || style.overflowY === "scroll") &&
+      el.scrollHeight > el.clientHeight + 10;
+    const canX = (style.overflowX === "auto" || style.overflowX === "scroll") &&
+      el.scrollWidth > el.clientWidth + 10;
+    return canY || canX;
+  }
+
   function detectScrollContainer() {
     const html = document.documentElement;
     const body = document.body;
+    const scrollingElement = document.scrollingElement || html;
 
-    if (html.scrollHeight > html.clientHeight + 10) {
-      const htmlOF = getComputedStyle(html).overflowY;
-      const bodyOF = getComputedStyle(body).overflowY;
-      if (htmlOF !== "hidden" && bodyOF !== "hidden") {
-        return null;
-      }
+    const pageCanScroll = scrollingElement.scrollHeight > scrollingElement.clientHeight + 10 ||
+      scrollingElement.scrollWidth > scrollingElement.clientWidth + 10;
+    const htmlOF = getComputedStyle(html);
+    const bodyOF = getComputedStyle(body);
+    const pageScrollBlocked = htmlOF.overflowY === "hidden" || bodyOF.overflowY === "hidden";
+
+    if (pageCanScroll && !pageScrollBlocked) {
+      return null;
     }
 
-    let best = null;
-    let bestArea = 0;
+    const candidates = new Set();
 
-    for (const el of document.querySelectorAll("*")) {
-      const oy = getComputedStyle(el).overflowY;
-      if (
-        (oy === "auto" || oy === "scroll") &&
-        el.scrollHeight > el.clientHeight + 10
-      ) {
-        const area = el.clientWidth * el.clientHeight;
-        if (area > bestArea) {
-          bestArea = area;
-          best = el;
+    // Start from visible elements and walk ancestors. This catches SPA shells
+    // without scanning every DOM node.
+    const sampleXs = [window.innerWidth / 2, 24, Math.max(24, window.innerWidth - 24)];
+    const sampleYs = [window.innerHeight / 2, 80, Math.max(80, window.innerHeight - 80)];
+    for (const x of sampleXs) {
+      for (const y of sampleYs) {
+        for (const el of document.elementsFromPoint(x, y)) {
+          let cur = el;
+          while (cur && cur !== document.body) {
+            candidates.add(cur);
+            cur = cur.parentElement;
+          }
         }
       }
     }
 
+    try {
+      for (const el of document.querySelectorAll(LIKELY_SCROLL_SELECTOR)) {
+        candidates.add(el);
+      }
+    } catch (e) {}
+
+    let best = findBestScrollable(candidates);
+
+    // Keep legacy behavior for small/simple pages where a full scan is cheap.
+    // Avoid it on huge DOMs, where it was the main performance problem.
+    if (!best && document.getElementsByTagName("*").length <= 2000) {
+      best = findBestScrollable(document.querySelectorAll("*"));
+    }
+
+    return best;
+  }
+
+  function findBestScrollable(elements) {
+    let best = null;
+    let bestArea = 0;
+    for (const el of elements) {
+      if (!isScrollable(el)) continue;
+      const area = el.clientWidth * el.clientHeight;
+      if (area > bestArea) {
+        bestArea = area;
+        best = el;
+      }
+    }
     return best;
   }
 
@@ -76,7 +133,7 @@
           elapsed >= 500 ||
           (Math.abs(pos.x - targetX) <= 1 && Math.abs(pos.y - targetY) <= 1)
         ) {
-          setTimeout(resolve, 100);
+          setTimeout(resolve, 50);
           return;
         }
         setTimeout(tick, 50);
