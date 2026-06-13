@@ -4,8 +4,15 @@ const fullPageBtn = document.getElementById("fullPageBtn");
 const viewportBtn = document.getElementById("viewportBtn");
 const regionBtn = document.getElementById("regionBtn");
 const scrollRegionBtn = document.getElementById("scrollRegionBtn");
-const outputMode = document.getElementById("outputMode");
+const outputToggle = document.getElementById("outputToggle");
+const grid = document.getElementById("grid");
+const overlay = document.getElementById("overlay");
+const overlayMsg = document.getElementById("overlayMsg");
+const overlayCheckIcon = document.getElementById("overlayCheckIcon");
+const overlayErrorIcon = document.getElementById("overlayErrorIcon");
 const status = document.getElementById("status");
+
+let outputMode = "clipboard";
 
 const CONTENT_SCRIPTS = [
   "/content/utils.js",
@@ -18,11 +25,24 @@ const CONTENT_SCRIPTS = [
 
 // Restore saved output preference
 browser.storage.local.get("outputMode").then((data) => {
-  if (data.outputMode) outputMode.value = data.outputMode;
+  if (data.outputMode) {
+    outputMode = data.outputMode;
+    updateToggle();
+  }
 });
 
-outputMode.addEventListener("change", () => {
-  browser.storage.local.set({ outputMode: outputMode.value });
+function updateToggle() {
+  outputToggle.querySelectorAll("button").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.value === outputMode);
+  });
+}
+
+outputToggle.querySelectorAll("button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    outputMode = btn.dataset.value;
+    updateToggle();
+    browser.storage.local.set({ outputMode });
+  });
 });
 
 fullPageBtn.addEventListener("click", () => triggerCapture("fullPage"));
@@ -34,7 +54,6 @@ async function triggerCapture(mode) {
   try {
     disableAll();
     status.textContent = mode === "region" ? "Select a region..." : "Capturing...";
-    status.className = "status";
 
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (!tab) throw new Error("No active tab");
@@ -53,23 +72,35 @@ async function triggerCapture(mode) {
     const result = await browser.tabs.sendMessage(tab.id, {
       action: "triggerCapture",
       mode,
-      output: outputMode.value,
+      output: outputMode,
       windowId: tab.windowId,
     });
 
     if (result && result.success) {
-      const msg = outputMode.value === "file" ? "✓ Saved" : "✓ Copied to clipboard";
-      status.textContent = msg;
-      status.className = "status success";
+      const msg = outputMode === "file" ? "Saved to file" : "Copied to clipboard";
+      showOverlay("success", msg);
     } else {
       throw new Error(result?.error || "Capture failed");
     }
   } catch (error) {
-    status.textContent = error.message;
-    status.className = "status error";
+    showOverlay("error", error.message);
   } finally {
     enableAll();
   }
+}
+
+function showOverlay(type, msg) {
+  status.textContent = "";
+  grid.style.display = "none";
+  overlay.className = "overlay show " + type;
+  overlayMsg.textContent = msg;
+  overlayCheckIcon.style.display = type === "success" ? "block" : "none";
+  overlayErrorIcon.style.display = type === "error" ? "block" : "none";
+
+  setTimeout(() => {
+    overlay.className = "overlay";
+    grid.style.display = "grid";
+  }, 1500);
 }
 
 async function injectContentScripts(tabId) {
