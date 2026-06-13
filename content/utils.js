@@ -23,32 +23,34 @@
       el.id = "_fullpage-capture-notify";
       Object.assign(el.style, {
         position: "fixed",
-        top: "16px",
+        top: "20px",
         left: "50%",
-        transform: "translateX(-50%)",
+        transform: "translateX(-50%) scale(0)",
         zIndex: "2147483647",
-        padding: "8px 16px",
-        borderRadius: "6px",
-        font: "600 14px system-ui, sans-serif",
-        color: "#fff",
-        boxShadow: "0 2px 8px rgba(0,0,0,.2)",
-        transition: "opacity .3s",
+        width: "48px",
+        height: "48px",
+        borderRadius: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow: "0 4px 12px rgba(0,0,0,.15)",
+        transition: "opacity .3s, transform .3s cubic-bezier(0.34,1.56,0.64,1)",
         pointerEvents: "none",
+        opacity: "0",
       });
       document.body.appendChild(el);
     }
-    Object.assign(el.style, {
-      top: "16px",
-      left: "50%",
-      right: "auto",
-      transform: "translateX(-50%)",
-    });
-    el.style.background = text.startsWith("✗") ? "#d32f2f" : "#2d7d46";
-    el.textContent = text;
+    const isError = text.startsWith("✗");
+    el.style.background = isError ? "#d32f2f" : "#2e7d32";
+    el.innerHTML = isError
+      ? '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+      : '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
     el.style.opacity = "1";
+    el.style.transform = "translateX(-50%) scale(1)";
     setTimeout(() => {
       el.style.opacity = "0";
-    }, 2000);
+      el.style.transform = "translateX(-50%) scale(0.8)";
+    }, 1500);
   };
 
   fpc.outputResult = async function outputResult(dataUrl, output) {
