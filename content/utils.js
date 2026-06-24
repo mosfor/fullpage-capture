@@ -78,9 +78,9 @@
     }
     const isError = text.startsWith("✗");
     el.style.setProperty("background", isError ? "#d32f2f" : "#2e7d32", "important");
-    el.innerHTML = isError
-      ? '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
-      : '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    el.textContent = isError ? "×" : "✓";
+    el.style.setProperty("color", "#fff", "important");
+    el.style.setProperty("font", "700 30px system-ui, sans-serif", "important");
     el.style.setProperty("opacity", "1", "important");
     el.style.setProperty("transform", "translateX(-50%) scale(1)", "important");
     if (notifyTimer) clearTimeout(notifyTimer);

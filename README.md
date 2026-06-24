@@ -1,16 +1,18 @@
 # FullPage Capture
 
-Minimal Firefox/Zen browser extension that captures screenshots and copies them to your clipboard as PNG.
+Minimal Firefox/Zen browser extension that captures screenshots and copies them to your clipboard as PNG. No tracking, no servers — everything runs locally.
 
 ## Features
 
-- **Full-page capture** — auto-scrolls and stitches the entire page
+- **Full-page capture** — auto-scrolls and stitches the entire page into one image
 - **Visible area capture** — grab exactly what's on screen
 - **Region selection** — draw a rectangle to capture any area
+- **Scrolling selection** — select a region then auto-scroll to capture content taller than the viewport with adjustable bounds
 - **Scroll container detection** — works on pages with inner scrollable areas (dashboards, SPAs)
 - **Sticky/fixed element handling** — hides fixed headers after the first frame to prevent duplication
 - **Clipboard or file** — output to clipboard or save as PNG file
 - **Keyboard shortcuts** — all configurable via `about:addons`
+- **Performance optimized** — reduced jank on large pages
 
 ## Install
 
@@ -27,11 +29,12 @@ Minimal Firefox/Zen browser extension that captures screenshots and copies them 
 
 ## Shortcuts
 
-| Action | Default | 
+| Action | Default |
 |--------|---------|
 | Full page | `Alt+Shift+1` |
 | Visible area | `Alt+Shift+2` |
 | Select region | `Alt+Shift+3` |
+| Scrolling selection | `Alt+Shift+4` |
 
 Customize in `about:addons` → gear icon → "Manage Extension Shortcuts"
 
@@ -43,6 +46,8 @@ Customize in `about:addons` → gear icon → "Manage Extension Shortcuts"
 4. Captures each viewport via `browser.tabs.captureVisibleTab()`
 5. Stitches all captures on a canvas
 6. Copies PNG to clipboard or triggers download
+
+**Scrolling selection** works differently: you draw a region, then the extension scrolls within that column and stitches only the selected width — useful for capturing a specific section of a long page.
 
 ## Permissions
 
