@@ -16,9 +16,22 @@ async function injectContentScripts(tabId) {
   }
 }
 
-browser.runtime.onMessage.addListener((request) => {
+browser.runtime.onMessage.addListener((request, sender) => {
   if (request.action === "captureVisibleTab") {
     return browser.tabs.captureVisibleTab(request.windowId || null, { format: "png" })
+      .then((dataUrl) => ({ success: true, dataUrl }))
+      .catch((error) => ({ success: false, error: error.message }));
+  }
+
+  // Firefox-only: render an arbitrary page rect straight from layout,
+  // without scrolling (tabs.captureTab + rect, FF 82+).
+  if (request.action === "captureTab") {
+    const tabId = sender.tab && sender.tab.id;
+    return browser.tabs.captureTab(tabId, {
+      format: "png",
+      rect: request.rect,
+      scale: request.scale,
+    })
       .then((dataUrl) => ({ success: true, dataUrl }))
       .catch((error) => ({ success: false, error: error.message }));
   }

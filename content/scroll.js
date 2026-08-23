@@ -48,8 +48,12 @@
 
     // Start from visible elements and walk ancestors. This catches SPA shells
     // without scanning every DOM node.
-    const sampleXs = [window.innerWidth / 2, 24, Math.max(24, window.innerWidth - 24)];
-    const sampleYs = [window.innerHeight / 2, 80, Math.max(80, window.innerHeight - 80)];
+    // clientWidth/clientHeight exclude scrollbars; innerWidth/innerHeight
+    // don't, and edge samples landing on a scrollbar hit nothing.
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const sampleXs = [vw / 2, 24, Math.max(24, vw - 24)];
+    const sampleYs = [vh / 2, 80, Math.max(80, vh - 80)];
     for (const x of sampleXs) {
       for (const y of sampleYs) {
         for (const el of document.elementsFromPoint(x, y)) {
@@ -101,12 +105,36 @@
   };
 
   fpc.scroll = function scroll(x, y) {
+    // "instant" bypasses CSS scroll-behavior: smooth, which would otherwise
+    // animate and leave tiles captured mid-scroll.
     const el = fpc.getScrollContainer();
-    if (el) {
-      el.scrollLeft = x;
-      el.scrollTop = y;
-    } else {
-      window.scrollTo(x, y);
+    const target = el || window;
+    try {
+      target.scrollTo({ left: x, top: y, behavior: "instant" });
+    } catch (e) {
+      if (el) {
+        el.scrollLeft = x;
+        el.scrollTop = y;
+      } else {
+        window.scrollTo(x, y);
+      }
+    }
+  };
+
+  let scrollEffectsStyle = null;
+
+  fpc.disableScrollEffects = function disableScrollEffects() {
+    if (scrollEffectsStyle) return;
+    scrollEffectsStyle = document.createElement("style");
+    scrollEffectsStyle.textContent =
+      "* { scroll-behavior: auto !important; scroll-snap-type: none !important; overflow-anchor: none !important; }";
+    document.documentElement.appendChild(scrollEffectsStyle);
+  };
+
+  fpc.restoreScrollEffects = function restoreScrollEffects() {
+    if (scrollEffectsStyle) {
+      scrollEffectsStyle.remove();
+      scrollEffectsStyle = null;
     }
   };
 

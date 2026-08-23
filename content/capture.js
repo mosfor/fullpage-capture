@@ -12,6 +12,54 @@
     return res.dataUrl;
   };
 
+  // Scroll through the page once so lazy-loaded images/content below the
+  // fold actually render before a direct (no-scroll) capture.
+  async function triggerLazyLoad(dims) {
+    const { fullHeight, viewportHeight } = dims;
+    const step = Math.max(viewportHeight, fullHeight / 40);
+    for (let y = step; y < fullHeight; y += step) {
+      fpc.scroll(0, Math.min(y, fullHeight - viewportHeight));
+      await fpc.nextPaint();
+      await fpc.sleep(40);
+    }
+  }
+
+  // Direct render path: Firefox can rasterize any page rect from layout
+  // without scrolling, so sticky/fixed elements paint exactly once and there
+  // are no stitching seams. Only valid when the page itself is the scroller —
+  // content inside an inner scroll container is clipped in layout.
+  fpc.captureFullPageDirect = async function captureFullPageDirect(dims) {
+    const { fullWidth, fullHeight } = dims;
+    const dpr = window.devicePixelRatio || 1;
+    const MAX_DIM = 32767;
+    const MAX_CANVAS_PIXELS = 100e6;
+    const scale = Math.min(
+      dpr,
+      MAX_DIM / fullWidth,
+      MAX_DIM / fullHeight,
+      Math.sqrt(MAX_CANVAS_PIXELS / (fullWidth * fullHeight)),
+    );
+
+    fpc.disableScrollEffects();
+    try {
+      await triggerLazyLoad(dims);
+      fpc.scroll(0, 0);
+      await fpc.awaitScroll(0, 0);
+      await fpc.waitForCaptureReady();
+
+      const res = await browser.runtime.sendMessage({
+        action: "captureTab",
+        rect: { x: 0, y: 0, width: fullWidth, height: fullHeight },
+        scale,
+      });
+      if (!res.success) throw new Error(res.error);
+      return res.dataUrl;
+    } finally {
+      fpc.restoreScrollEffects();
+      fpc.scroll(dims.scrollX, dims.scrollY);
+    }
+  };
+
   fpc.captureFullPage = async function captureFullPage(windowId) {
     const dims = fpc.getPageDimensions();
     const { fullWidth, fullHeight, viewportWidth, viewportHeight } = dims;
@@ -22,27 +70,41 @@
       return fpc.captureViewport(windowId);
     }
 
+    if (!fpc.getScrollContainer()) {
+      try {
+        return await fpc.captureFullPageDirect(dims);
+      } catch (e) {
+        // captureTab unavailable or failed — fall back to scroll-and-stitch.
+      }
+    }
+
+    // captureVisibleTab returns device pixels; the canvas must match or the
+    // stitch only samples part of each tile on HiDPI/zoomed pages. Cap total
+    // pixels to stay under Firefox's canvas allocation limit on huge pages.
+    const dpr = window.devicePixelRatio || 1;
+    const MAX_CANVAS_PIXELS = 100e6;
+    const scale = Math.min(dpr, Math.sqrt(MAX_CANVAS_PIXELS / (fullWidth * fullHeight)));
+
+    fpc.disableScrollEffects();
     fpc.scroll(0, 0);
     await fpc.awaitScroll(0, 0);
 
-    const headers = fpc.findFixedElements()
-      .filter((el) => el.isHeader)
-      .map((el) => el.selector);
+    const fixedElements = fpc.findFixedElements();
 
     const cols = Math.ceil(fullWidth / viewportWidth);
     const rows = Math.ceil(fullHeight / viewportHeight);
     const canvas = document.createElement("canvas");
-    canvas.width = fullWidth;
-    canvas.height = fullHeight;
+    canvas.width = Math.round(fullWidth * scale);
+    canvas.height = Math.round(fullHeight * scale);
     const ctx = canvas.getContext("2d");
 
-    let headersHidden = false;
+    let fixedHidden = false;
 
     try {
       for (let row = 0; row < rows; row++) {
-        if (row === 1 && headers.length > 0 && !headersHidden) {
-          fpc.hideFixed(headers);
-          headersHidden = true;
+        if (row === 1 && fixedElements.length > 0 && !fixedHidden) {
+          fpc.hideFixed(fixedElements);
+          fixedHidden = true;
         }
 
         for (let col = 0; col < cols; col++) {
@@ -62,18 +124,32 @@
           if (!res.success) throw new Error(res.error);
 
           const img = await fpc.loadImage(res.dataUrl);
+          // When scrolling an inner container, the screenshot is of the whole
+          // window — offset by the container's on-screen position.
+          const vpOffset = fpc.getScrollViewportRect();
           const srcX = idealX - clampedX;
           const srcY = idealY - clampedY;
           const drawW = Math.min(viewportWidth - srcX, fullWidth - idealX);
           const drawH = Math.min(viewportHeight - srcY, fullHeight - idealY);
 
           if (drawW > 0 && drawH > 0) {
-            ctx.drawImage(img, srcX, srcY, drawW, drawH, idealX, idealY, drawW, drawH);
+            ctx.drawImage(
+              img,
+              (vpOffset.left + srcX) * dpr,
+              (vpOffset.top + srcY) * dpr,
+              drawW * dpr,
+              drawH * dpr,
+              idealX * scale,
+              idealY * scale,
+              drawW * scale,
+              drawH * scale,
+            );
           }
         }
       }
     } finally {
-      if (headersHidden) fpc.restoreFixed();
+      if (fixedHidden) fpc.restoreFixed();
+      fpc.restoreScrollEffects();
       fpc.scroll(origX, origY);
     }
 
@@ -137,10 +213,9 @@
     canvas.height = Math.round(selH * dpr);
     const ctx = canvas.getContext("2d");
 
-    const headers = fpc.findFixedElements()
-      .filter((el) => el.isHeader)
-      .map((el) => el.selector);
+    const fixedElements = fpc.findFixedElements();
 
+    fpc.disableScrollEffects();
     fpc.scroll(0, 0);
     await fpc.awaitScroll(0, 0);
 
@@ -148,13 +223,13 @@
     const endCol = Math.ceil((selX + selW) / viewportWidth);
     const startRow = Math.floor(selY / viewportHeight);
     const endRow = Math.ceil((selY + selH) / viewportHeight);
-    let headersHidden = false;
+    let fixedHidden = false;
 
     try {
       for (let row = startRow; row < endRow; row++) {
-        if (row > startRow && headers.length > 0 && !headersHidden) {
-          fpc.hideFixed(headers);
-          headersHidden = true;
+        if (row > startRow && fixedElements.length > 0 && !fixedHidden) {
+          fpc.hideFixed(fixedElements);
+          fixedHidden = true;
         }
 
         for (let col = startCol; col < endCol; col++) {
@@ -210,7 +285,8 @@
         }
       }
     } finally {
-      if (headersHidden) fpc.restoreFixed();
+      if (fixedHidden) fpc.restoreFixed();
+      fpc.restoreScrollEffects();
       fpc.scroll(origX, origY);
     }
 
