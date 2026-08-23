@@ -147,8 +147,10 @@
   fpc.getScrollViewportRect = function getScrollViewportRect() {
     const el = fpc.getScrollContainer();
     if (!el) return { left: 0, top: 0 };
+    // Scrolled content paints inside the client area, not the border box —
+    // clientLeft/clientTop are the border (and any left scrollbar) offsets.
     const rect = el.getBoundingClientRect();
-    return { left: rect.left, top: rect.top };
+    return { left: rect.left + el.clientLeft, top: rect.top + el.clientTop };
   };
 
   fpc.awaitScroll = function awaitScroll(targetX, targetY) {
