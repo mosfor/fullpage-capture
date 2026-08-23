@@ -23,9 +23,13 @@
     const candidates = new Set();
 
     // Sample what's actually painted in the viewport. This catches most fixed
-    // overlays without walking the whole DOM on large pages.
-    const sampleXs = [8, window.innerWidth / 2, Math.max(8, window.innerWidth - 8)];
-    const sampleYs = [8, 48, 96, window.innerHeight / 2, Math.max(8, window.innerHeight - 8)];
+    // overlays without walking the whole DOM on large pages. Use clientWidth/
+    // clientHeight, not innerWidth/innerHeight: the latter include scrollbars,
+    // and edge samples landing on a scrollbar hit nothing.
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const sampleXs = [8, vw / 2, Math.max(8, vw - 8)];
+    const sampleYs = [8, 48, 96, vh / 2, Math.max(8, vh - 8)];
     for (const x of sampleXs) {
       for (const y of sampleYs) {
         for (const el of document.elementsFromPoint(x, y)) {
@@ -69,39 +73,38 @@
 
       const selector = uniqueSelector(el);
       if (selector) {
-        results.push({
-          selector,
-          isHeader: rect.top < window.innerHeight / 2 && rect.height < 200,
-        });
+        results.push({ selector, position: style.position });
       }
     }
     return results;
   }
 
-  fpc.hideFixed = function hideFixed(selectors) {
-    for (const sel of selectors) {
+  // Fixed elements are hidden (they float over content and would repeat in
+  // every tile). Sticky elements are un-stuck instead: switched to static so
+  // they render once at their natural in-flow position and no content is lost.
+  fpc.hideFixed = function hideFixed(items) {
+    for (const item of items) {
+      const sel = typeof item === "string" ? item : item.selector;
+      const position = typeof item === "string" ? "fixed" : item.position;
       try {
         const el = document.querySelector(sel);
-        if (el) {
-          originalStyles.set(sel, {
-            visibility: el.style.visibility,
-            opacity: el.style.opacity,
-          });
-          el.style.visibility = "hidden";
-          el.style.opacity = "0";
+        if (!el || originalStyles.has(sel)) continue;
+        originalStyles.set(sel, el.style.cssText);
+        if (position === "sticky") {
+          el.style.setProperty("position", "static", "important");
+        } else {
+          el.style.setProperty("visibility", "hidden", "important");
+          el.style.setProperty("opacity", "0", "important");
         }
       } catch (e) {}
     }
   };
 
   fpc.restoreFixed = function restoreFixed() {
-    for (const [sel, styles] of originalStyles) {
+    for (const [sel, cssText] of originalStyles) {
       try {
         const el = document.querySelector(sel);
-        if (el) {
-          el.style.visibility = styles.visibility;
-          el.style.opacity = styles.opacity;
-        }
+        if (el) el.style.cssText = cssText;
       } catch (e) {}
     }
     originalStyles.clear();

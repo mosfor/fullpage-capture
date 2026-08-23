@@ -4,12 +4,12 @@ Minimal Firefox/Zen browser extension that captures screenshots and copies them 
 
 ## Features
 
-- **Full-page capture** — auto-scrolls and stitches the entire page into one image
+- **Full-page capture** — renders the entire page in one pass (no scrolling artifacts); falls back to scroll-and-stitch for pages with inner scroll containers
 - **Visible area capture** — grab exactly what's on screen
 - **Region selection** — draw a rectangle to capture any area
 - **Scrolling selection** — select a region then auto-scroll to capture content taller than the viewport with adjustable bounds
 - **Scroll container detection** — works on pages with inner scrollable areas (dashboards, SPAs)
-- **Sticky/fixed element handling** — hides fixed headers after the first frame to prevent duplication
+- **Sticky/fixed element handling** — fixed elements are hidden and sticky ones (sidebars, TOCs) un-stuck after the first frame, so nothing repeats in the stitched image
 - **Clipboard or file** — output to clipboard or save as PNG file
 - **Keyboard shortcuts** — all configurable via `about:addons`
 - **Performance optimized** — reduced jank on large pages
@@ -42,10 +42,9 @@ Customize in `about:addons` → gear icon → "Manage Extension Shortcuts"
 
 1. Detects if the page uses a scrollable container or standard body scroll
 2. Measures full scrollable dimensions
-3. Scrolls through the page in viewport-sized steps
-4. Captures each viewport via `browser.tabs.captureVisibleTab()`
-5. Stitches all captures on a canvas
-6. Copies PNG to clipboard or triggers download
+3. **Standard pages:** does one quick scroll pass to trigger lazy-loaded content, then renders the whole page in a single call via `browser.tabs.captureTab()` with a `rect` — no scrolling, no stitching, sticky elements painted exactly once
+4. **Pages with inner scroll containers** (dashboards, SPAs): scrolls in viewport-sized steps, captures each via `browser.tabs.captureVisibleTab()`, and stitches on a canvas — hiding fixed elements and un-sticking sticky ones after the first frame
+5. Copies PNG to clipboard or triggers download
 
 **Scrolling selection** works differently: you draw a region, then the extension scrolls within that column and stitches only the selected width — useful for capturing a specific section of a long page.
 

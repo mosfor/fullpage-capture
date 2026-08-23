@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Capture harness</title>
+<style>
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: sans-serif; }
+  .layout { display: flex; }
+  .sidebar {
+    position: sticky; top: 0; align-self: flex-start;
+    width: 180px; height: 100vh; background: #f6f6f6;
+    border-right: 1px solid #ddd; padding: 12px; box-sizing: border-box;
+  }
+  .content { flex: 1; padding: 24px; }
+  .toc {
+    position: sticky; top: 0; align-self: flex-start;
+    width: 140px; padding: 12px; border-left: 2px solid #f60;
+  }
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px;
+    background: #222; color: #fff; z-index: 10;
+    display: flex; align-items: center; padding: 0 16px;
+  }
+  .section { height: 600px; border: 1px solid #ccc; margin: 16px 0; padding: 12px; }
+</style>
+<script>
+// Stub the WebExtension messaging layer so the real capture code runs
+// unmodified. Records every call plus page state at capture time.
+window.__calls = [];
+window.__failCaptureTab = false;
+
+function syntheticImage(w, h, label) {
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(w));
+  c.height = Math.max(1, Math.round(h));
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#ddeeff";
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillStyle = "#000";
+  ctx.font = "20px sans-serif";
+  ctx.fillText(label, 10, 30);
+  return c.toDataURL("image/png");
+}
+
+window.browser = {
+  runtime: {
+    sendMessage: async (msg) => {
+      const state = {
+        scrollY: window.scrollY,
+        sidebarPosition: getComputedStyle(document.getElementById("sidebar")).position,
+        tocPosition: getComputedStyle(document.getElementById("toc")).position,
+        topbarVisibility: getComputedStyle(document.getElementById("topbar")).visibility,
+      };
+      if (msg.action === "captureVisibleTab") {
+        window.__calls.push({ action: msg.action, state });
+        const dpr = window.devicePixelRatio || 1;
+        return {
+          success: true,
+          dataUrl: syntheticImage(window.innerWidth * dpr, window.innerHeight * dpr, "y=" + window.scrollY),
+        };
+      }
+      if (msg.action === "captureTab") {
+        window.__calls.push({ action: msg.action, rect: msg.rect, scale: msg.scale, state });
+        if (window.__failCaptureTab) {
+          return { success: false, error: "captureTab not supported (test)" };
+        }
+        return {
+          success: true,
+          dataUrl: syntheticImage(msg.rect.width * msg.scale, msg.rect.height * msg.scale, "direct"),
+        };
+      }
+      return { success: false, error: "unknown action " + msg.action };
+    },
+  },
+};
+</script>
+<script src="/content/utils.js"></script>
+<script src="/content/scroll.js"></script>
+<script src="/content/fixed-elements.js"></script>
+<script src="/content/capture.js"></script>
+<script>
+window.runCapture = async function runCapture() {
+  window.__calls = [];
+  const before = { scrollY: window.scrollY };
+  const result = await window.FullPageCapture.captureFullPage(1);
+  let imageSize = null;
+  if (result instanceof Blob) {
+    const bmp = await createImageBitmap(result);
+    imageSize = { width: bmp.width, height: bmp.height, kind: "blob" };
+    bmp.close();
+  } else if (typeof result === "string") {
+    const blob = await fetch(result).then((r) => r.blob());
+    const bmp = await createImageBitmap(blob);
+    imageSize = { width: bmp.width, height: bmp.height, kind: "dataUrl" };
+    bmp.close();
+  }
+  return {
+    dims: window.FullPageCapture.getPageDimensions(),
+    dpr: window.devicePixelRatio || 1,
+    calls: window.__calls,
+    imageSize,
+    after: {
+      scrollY: window.scrollY,
+      sidebarPosition: getComputedStyle(document.getElementById("sidebar")).position,
+      tocPosition: getComputedStyle(document.getElementById("toc")).position,
+      topbarVisibility: getComputedStyle(document.getElementById("topbar")).visibility,
+      scrollEffectsStyleGone: ![...document.querySelectorAll("style")].some((s) =>
+        s.textContent.includes("overflow-anchor")),
+    },
+    scrolledBefore: before,
+  };
+};
+</script>
+</head>
+<body>
+<div class="topbar" id="topbar">Fixed top bar</div>
+<div class="layout" style="padding-top:48px">
+  <nav class="sidebar" id="sidebar">Sticky sidebar<br>Item A<br>Item B<br>Item C</nav>
+  <main class="content">
+    <div class="section" id="s1">Section 1</div>
+    <div class="section" id="s2">Section 2</div>
+    <div class="section" id="s3">Section 3</div>
+    <div class="section" id="s4">Section 4</div>
+    <div class="section" id="s5">Section 5</div>
+  </main>
+  <aside class="toc" id="toc">Sticky TOC<br>On this page</aside>
+</div>
+</body>
+</html>
