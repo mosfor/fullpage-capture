@@ -72,10 +72,14 @@
 
     if (!fpc.getScrollContainer()) {
       try {
+        console.debug("[FullPage Capture] direct render path (captureTab)", dims);
         return await fpc.captureFullPageDirect(dims);
       } catch (e) {
         // captureTab unavailable or failed — fall back to scroll-and-stitch.
+        console.debug("[FullPage Capture] direct path failed, falling back to stitch:", e.message);
       }
+    } else {
+      console.debug("[FullPage Capture] inner scroll container detected, using stitch path", fpc.getScrollContainer());
     }
 
     // captureVisibleTab returns device pixels; the canvas must match or the
@@ -90,6 +94,7 @@
     await fpc.awaitScroll(0, 0);
 
     const fixedElements = fpc.findFixedElements();
+    console.debug("[FullPage Capture] fixed/sticky elements to neutralize:", fixedElements);
 
     const cols = Math.ceil(fullWidth / viewportWidth);
     const rows = Math.ceil(fullHeight / viewportHeight);

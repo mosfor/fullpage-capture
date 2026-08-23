@@ -19,7 +19,12 @@
           success: true,
         }));
       case "getFixedElements":
-        return Promise.resolve({ elements: fpc.findFixedElements() });
+        return Promise.resolve({
+          elements: fpc.findFixedElements().map(({ el, position }) => ({
+            selector: fpc.uniqueSelector(el),
+            position,
+          })),
+        });
       case "hideFixedElements":
         fpc.hideFixed(request.selectors);
         return Promise.resolve({ success: true });
