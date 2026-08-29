@@ -60,6 +60,27 @@
           dx * scale, dy * scale, w * scale, h * scale);
       }
     }
+
+    // Side chrome (sidebar, container borders) only exists at the container's
+    // original client height; continue it down to the expanded bottom edge by
+    // stretching each side strip's bottom pixel rows (edge clamp). A solid
+    // sidebar continues its color and a border continues its lines, without
+    // tiling nav items or distorting text.
+    const extraH = fullHeight - ch.clientH;
+    const edge = Math.min(2, ch.clientH);
+    if (extraH > 0 && edge > 0) {
+      const sides = [
+        [0, ch.left, 0],
+        [ch.left + ch.clientW, ch.vw - ch.left - ch.clientW, ch.left + fullWidth],
+      ];
+      for (const [sx, w, dx] of sides) {
+        if (w > 0) {
+          ctx.drawImage(img,
+            sx * dpr, (ch.top + ch.clientH - edge) * dpr, w * dpr, edge * dpr,
+            dx * scale, (ch.top + ch.clientH) * scale, w * scale, extraH * scale);
+        }
+      }
+    }
   }
 
   // Direct render path: Firefox can rasterize any page rect from layout

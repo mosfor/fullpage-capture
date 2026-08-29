@@ -156,8 +156,14 @@ async function capture(driver, url) {
       png.width === Math.round(expW) && png.height === Math.round(expH),
       `got ${png.width}x${png.height}`);
     check("inner chrome marker painted once", near(px(png, 10, 10), [255, 0, 255]), `got ${px(png, 10, 10)}`);
-    check("inner blank continuation = body bg",
+    // Side strips continue below their original height via edge clamp: left of
+    // the border the clamped edge row is body bg, on the border it stays black.
+    check("inner side continuation left of border = clamped bg",
       near(px(png, 10, m.top + m.ch + 300), [0, 128, 0]), `got ${px(png, 10, m.top + m.ch + 300)}`);
+    check("inner left border continues below strip",
+      near(px(png, m.left - 5, m.top + m.ch + 300), [0, 0, 0]), `got ${px(png, m.left - 5, m.top + m.ch + 300)}`);
+    check("inner left border continues to expanded bottom",
+      near(px(png, m.left - 5, m.top + m.sh - 30), [0, 0, 0]), `got ${px(png, m.left - 5, m.top + m.sh - 30)}`);
     check("inner sticky painted once (top)",
       near(px(png, m.left + 75, m.top + 60), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 60)}`);
     check("inner sticky not repeated below fold",
@@ -359,6 +365,22 @@ async function capture(driver, url) {
       near(px(png, 500, 3400), SLOW_IMG_COLOR), `got ${px(png, 500, 3400)}`);
     checkGrid(png, "lazy", 800, 2300);
     checkGrid(png, "lazy", 600, 3560);
+
+    // --- fixture 13: RTL dashboard with solid sidebar chrome ---
+    console.log("fixture: rtl-dash.html (RTL sidebar chrome continues full height)");
+    png = await capture(driver, `http://127.0.0.1:${PORT}/rtl-dash.html`);
+    m = await containerMetrics(driver);
+    expW = m.vw - m.cw + m.sw;
+    expH = m.vh - m.ch + m.sh;
+    check(`rtl-dash size = ${expW}x${expH}`,
+      png.width === Math.round(expW) && png.height === Math.round(expH),
+      `got ${png.width}x${png.height}`);
+    const sidebar = [11, 61, 46]; // .sidebar background #0b3d2e
+    check("rtl-dash sidebar painted at top",
+      near(px(png, png.width - 100, 450), sidebar), `got ${px(png, png.width - 100, 450)}`);
+    check("rtl-dash sidebar continues near expanded bottom",
+      near(px(png, png.width - 100, m.top + m.sh - 30), sidebar),
+      `got ${px(png, png.width - 100, m.top + m.sh - 30)}`);
 
     console.log(failures.length === 0
       ? "\nALL E2E CHECKS PASSED"
