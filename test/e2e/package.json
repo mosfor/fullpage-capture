@@ -1,0 +1,12 @@
+{
+  "name": "fullpage-capture-e2e",
+  "private": true,
+  "description": "Real-Firefox end-to-end tests for FullPage Capture",
+  "scripts": {
+    "test": "node run.js"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0",
+    "selenium-webdriver": "^4.27.0"
+  }
+}

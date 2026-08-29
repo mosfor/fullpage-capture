@@ -71,10 +71,7 @@
       const rect = el.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) continue;
 
-      const selector = uniqueSelector(el);
-      if (selector) {
-        results.push({ selector, position: style.position });
-      }
+      results.push({ el, position: style.position });
     }
     return results;
   }
@@ -82,14 +79,15 @@
   // Fixed elements are hidden (they float over content and would repeat in
   // every tile). Sticky elements are un-stuck instead: switched to static so
   // they render once at their natural in-flow position and no content is lost.
+  // Items carry direct element references — regenerated CSS selectors are
+  // unreliable on class-heavy SPAs and used only for the legacy string form.
   fpc.hideFixed = function hideFixed(items) {
     for (const item of items) {
-      const sel = typeof item === "string" ? item : item.selector;
-      const position = typeof item === "string" ? "fixed" : item.position;
       try {
-        const el = document.querySelector(sel);
-        if (!el || originalStyles.has(sel)) continue;
-        originalStyles.set(sel, el.style.cssText);
+        const el = typeof item === "string" ? document.querySelector(item) : item.el;
+        const position = typeof item === "string" ? "fixed" : item.position;
+        if (!el || originalStyles.has(el)) continue;
+        originalStyles.set(el, el.style.cssText);
         if (position === "sticky") {
           el.style.setProperty("position", "static", "important");
         } else {
@@ -101,14 +99,15 @@
   };
 
   fpc.restoreFixed = function restoreFixed() {
-    for (const [sel, cssText] of originalStyles) {
+    for (const [el, cssText] of originalStyles) {
       try {
-        const el = document.querySelector(sel);
-        if (el) el.style.cssText = cssText;
+        el.style.cssText = cssText;
       } catch (e) {}
     }
     originalStyles.clear();
   };
+
+  fpc.uniqueSelector = uniqueSelector;
 
   function uniqueSelector(el) {
     if (el.id) return "#" + CSS.escape(el.id);
