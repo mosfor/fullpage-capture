@@ -28,6 +28,19 @@
     }
   }
 
+  // The scroll pre-pass only STARTS lazy image fetches; captureTab must not
+  // fire before they finish decoding or below-the-fold images come out as
+  // blank placeholders. Bounded by a global cap so a broken image or a slow
+  // network can never hang the capture.
+  async function waitForImages(capMs = 4000) {
+    const pending = [...document.images]
+      .filter((img) => img.currentSrc && !(img.complete && img.naturalWidth > 0))
+      .map((img) => img.decode().catch(() => {}));
+    if (pending.length === 0) return;
+    console.debug(`[FullPage Capture] waiting for ${pending.length} image(s) to load`);
+    await Promise.race([Promise.all(pending), fpc.sleep(capMs)]);
+  }
+
   // Copy the four regions around an inner scroll container (header, sidebars,
   // footer) from the first frame. The right and bottom strips shift to the far
   // edges of the expanded canvas; the area a strip doesn't reach stays the
@@ -91,6 +104,7 @@
 
       fpc.scroll(0, 0);
       await fpc.awaitScroll(0, 0);
+      await waitForImages();
       // Top fixed headers paint exactly once at the top in a direct render —
       // correct. Bottom-anchored overlays (cookie banners) would paint at the
       // first viewport's bottom, i.e. mid-image, occluding content: hide them.
