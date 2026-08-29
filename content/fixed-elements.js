@@ -19,6 +19,50 @@
     "[id*='sticky' i]",
   ].join(",");
 
+  // A position:fixed element covering (nearly) the whole viewport is almost
+  // never chrome (a navbar, banner, cookie bar) — it is a content wrapper, as
+  // used by transform-based smooth-scroll libraries (Locomotive, Lenis): the
+  // page keeps a native scrollbar via a tall spacer while the visible content
+  // lives in a full-viewport fixed wrapper moved with translateY. Hiding it
+  // would blank the entire capture. Tradeoff: full-screen fixed modals also
+  // match and stay visible in every tile.
+  const VIEWPORT_COVER_RATIO = 0.85;
+
+  function coversViewport(rect) {
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const w = Math.min(rect.right, vw) - Math.max(rect.left, 0);
+    const h = Math.min(rect.bottom, vh) - Math.max(rect.top, 0);
+    return w > 0 && h > 0 && (w * h) / (vw * vh) >= VIEWPORT_COVER_RATIO;
+  }
+
+  // Detects a full-viewport fixed content wrapper (transform-scroll pages).
+  // Samples painted elements around the viewport center and walks ancestors —
+  // the wrapper always paints there, so no full DOM scan is needed.
+  fpc.hasFullViewportFixed = function hasFullViewportFixed() {
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    const seen = new Set();
+    for (const [x, y] of [[vw / 2, vh / 2], [vw / 4, vh / 4], [(3 * vw) / 4, (3 * vh) / 4]]) {
+      for (const el of document.elementsFromPoint(x, y)) {
+        let cur = el;
+        while (cur && cur !== document.body && cur !== document.documentElement) {
+          if (!seen.has(cur)) {
+            seen.add(cur);
+            if (
+              getComputedStyle(cur).position === "fixed" &&
+              coversViewport(cur.getBoundingClientRect())
+            ) {
+              return true;
+            }
+          }
+          cur = cur.parentElement;
+        }
+      }
+    }
+    return false;
+  };
+
   fpc.findFixedElements = function findFixedElements() {
     const candidates = new Set();
 
@@ -123,6 +167,9 @@
 
       const rect = el.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) continue;
+
+      // Full-viewport fixed wrappers are content, not chrome — leave them.
+      if (style.position === "fixed" && coversViewport(rect)) continue;
 
       results.push({ el, position: style.position });
     }

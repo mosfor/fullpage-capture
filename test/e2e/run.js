@@ -234,6 +234,25 @@ async function capture(driver, url) {
     checkGrid(png, "growing-small", 600, 2450);  // start of lazy tail
     checkGrid(png, "growing-small", 900, 2760);  // near the grown bottom
 
+    // --- fixture 8: transform-based smooth scroll (Locomotive/Lenis style) ---
+    // Document scrolls via a tall spacer, but content lives in a full-viewport
+    // fixed wrapper moved by translateY. Direct rasterization would be blank
+    // below the fold; the wrapper must not be hidden as a fixed overlay. Grid
+    // colors encode page position, so correct probes at several depths prove
+    // real content rather than blank or repeated frames.
+    console.log("fixture: transform-scroll.html (fixed wrapper + translateY, stitch fallback)");
+    png = await capture(driver, `http://127.0.0.1:${PORT}/transform-scroll.html`);
+    check("transform-scroll height = 4000 (full spacer height)", png.height === 4000, `got ${png.height}`);
+    check("transform-scroll width >= 1200", png.width >= 1200, `got ${png.width}`);
+    checkGrid(png, "transform-scroll", 600, 200);
+    checkGrid(png, "transform-scroll", 600, 1200);
+    checkGrid(png, "transform-scroll", 900, 2500);
+    checkGrid(png, "transform-scroll", 600, 3960);
+    const restored8 = await driver.executeScript(
+      'return { scrollY: window.scrollY, viewVisibility: getComputedStyle(document.getElementById("view")).visibility }');
+    check("transform-scroll: page state restored",
+      restored8.scrollY === 0 && restored8.viewVisibility === "visible", JSON.stringify(restored8));
+
     console.log(failures.length === 0
       ? "\nALL E2E CHECKS PASSED"
       : `\n${failures.length} CHECK(S) FAILED:\n - ` + failures.join("\n - "));
