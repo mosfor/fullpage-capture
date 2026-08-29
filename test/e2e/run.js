@@ -20,8 +20,28 @@ const PORT = 8899;
 
 // ---------- fixture server ----------
 
+// Solid-color PNG for lazy-image fixtures — probed pixel-by-pixel in output.
+function solidPng(r, g, b) {
+  const png = new PNG({ width: 64, height: 64 });
+  for (let i = 0; i < png.data.length; i += 4) {
+    png.data[i] = r; png.data[i + 1] = g; png.data[i + 2] = b; png.data[i + 3] = 255;
+  }
+  return PNG.sync.write(png);
+}
+
+const SLOW_IMG_DELAY_MS = 800;
+const SLOW_IMG_COLOR = [0, 200, 120];
+
 function serveFixtures() {
   const server = http.createServer((req, res) => {
+    // /slow/*.png: artificially delayed image, simulating a lazy-loaded
+    // image whose fetch is still in flight when the capture would fire.
+    if (/^\/slow\/[\w-]+\.png$/.test(req.url)) {
+      setTimeout(() => {
+        res.writeHead(200, { "content-type": "image/png" }).end(solidPng(...SLOW_IMG_COLOR));
+      }, SLOW_IMG_DELAY_MS);
+      return;
+    }
     const file = path.join(FIXTURES, path.normalize(req.url).replace(/^\/+/, ""));
     if (!file.startsWith(FIXTURES) || !fs.existsSync(file)) {
       res.writeHead(404).end();
@@ -326,6 +346,19 @@ async function capture(driver, url) {
       'return { scrollY: window.scrollY, vis: getComputedStyle(document.getElementById("cookie")).visibility }');
     check("banner-direct: page state restored", restored10.scrollY === 0 && restored10.vis === "visible",
       JSON.stringify(restored10));
+
+    // --- fixture 11: lazy images below the fold, sources served slowly ---
+    console.log("fixture: lazy.html (delayed lazy images, direct render path)");
+    png = await capture(driver, `http://127.0.0.1:${PORT}/lazy.html`);
+    check("lazy height = 3600", png.height === 3600, `got ${png.height}`);
+    // Images sit at (400,2200) and (400,3300), 200x200. If the capture fired
+    // before the delayed fetches completed they'd show the grid underneath.
+    check("lazy image 1 loaded (not blank)",
+      near(px(png, 500, 2300), SLOW_IMG_COLOR), `got ${px(png, 500, 2300)}`);
+    check("lazy image 2 loaded (not blank)",
+      near(px(png, 500, 3400), SLOW_IMG_COLOR), `got ${px(png, 500, 3400)}`);
+    checkGrid(png, "lazy", 800, 2300);
+    checkGrid(png, "lazy", 600, 3560);
 
     console.log(failures.length === 0
       ? "\nALL E2E CHECKS PASSED"

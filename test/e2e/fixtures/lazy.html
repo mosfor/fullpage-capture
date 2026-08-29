@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>e2e: lazy images below the fold</title>
+<style>
+  body { margin: 0; }
+  /* Position-encoded grid: painted by script into #grid. */
+  #grid { position: absolute; top: 0; left: 0; z-index: 0; }
+  .lazy-img {
+    position: absolute; left: 400px; width: 200px; height: 200px;
+    z-index: 1; display: block;
+  }
+</style>
+</head>
+<body>
+<canvas id="grid" width="1200" height="3600"></canvas>
+<!-- Below-fold lazy images whose sources are served with an artificial
+     delay (~800ms) by the fixture server: the scroll pre-pass starts the
+     fetch but the capture must wait for them to actually load. -->
+<img class="lazy-img" style="top: 2200px" loading="lazy" src="/slow/teal.png">
+<img class="lazy-img" style="top: 3300px" loading="lazy" src="/slow/teal.png">
+<script>
+  // Each 16px cell's color encodes its page coordinate:
+  // r = cellX + 1, g = cellY + 1, b = 64.
+  const c = document.getElementById("grid");
+  const ctx = c.getContext("2d");
+  for (let cy = 0; cy * 16 < c.height; cy++) {
+    for (let cx = 0; cx * 16 < c.width; cx++) {
+      ctx.fillStyle = `rgb(${(cx + 1) & 255}, ${(cy + 1) & 255}, 64)`;
+      ctx.fillRect(cx * 16, cy * 16, 16, 16);
+    }
+  }
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>
