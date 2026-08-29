@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>explore: transform-based smooth scroll (locomotive-style)</title>
+<style>
+  html, body { margin: 0; }
+  /* native scrollbar driven by a spacer; real content is fixed + translated */
+  #spacer { height: 8000px; }
+  #view { position: fixed; inset: 0; overflow: hidden; }
+  #content { will-change: transform; }
+  .sec { height: 800px; display: flex; align-items: center; justify-content: center;
+         font: 700 64px sans-serif; color: #fff; }
+</style>
+</head>
+<body>
+<div id="spacer"></div>
+<div id="view"><div id="content"></div></div>
+<script>
+  const content = document.getElementById("content");
+  const colors = ["#e53935","#8e24aa","#3949ab","#039be5","#00897b","#7cb342","#fdd835","#fb8c00","#6d4c41","#546e7a"];
+  for (let i = 0; i < 10; i++) {
+    const d = document.createElement("div");
+    d.className = "sec";
+    d.style.background = colors[i];
+    d.textContent = "SECTION " + (i + 1);
+    content.appendChild(d);
+  }
+  // locomotive/lenis-style: translate content by scroll position
+  function update() { content.style.transform = "translateY(" + (-window.scrollY) + "px)"; }
+  window.addEventListener("scroll", update, { passive: true });
+  update();
+</script>
+</body>
+</html>

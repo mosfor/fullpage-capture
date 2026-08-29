@@ -117,12 +117,22 @@
     }
 
     if (!fpc.getScrollContainer()) {
-      try {
-        console.debug("[FullPage Capture] direct render path (captureTab)", dims);
-        return await fpc.captureFullPageDirect(dims);
-      } catch (e) {
-        // captureTab unavailable or failed — fall back to scroll-and-stitch.
-        console.debug("[FullPage Capture] direct path failed, falling back to stitch:", e.message);
+      // Transform-based smooth-scroll pages (Locomotive/Lenis style) keep a
+      // native scrollbar via a tall spacer, but the visible content lives in
+      // a full-viewport position:fixed wrapper that a scroll handler moves
+      // with translateY. Nothing exists in layout below the fold, so the
+      // direct rasterization would be ~all blank — stitch instead: the page's
+      // own scroll handler updates the transform between tiles.
+      if (fpc.hasFullViewportFixed()) {
+        console.debug("[FullPage Capture] full-viewport fixed wrapper detected (transform scroll), using stitch path");
+      } else {
+        try {
+          console.debug("[FullPage Capture] direct render path (captureTab)", dims);
+          return await fpc.captureFullPageDirect(dims);
+        } catch (e) {
+          // captureTab unavailable or failed — fall back to scroll-and-stitch.
+          console.debug("[FullPage Capture] direct path failed, falling back to stitch:", e.message);
+        }
       }
     } else {
       console.debug("[FullPage Capture] inner scroll container detected, using stitch path", fpc.getScrollContainer());

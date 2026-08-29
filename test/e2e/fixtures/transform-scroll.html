@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>e2e: transform-based smooth scroll (locomotive-style)</title>
+<style>
+  html, body { margin: 0; }
+  /* Native scrollbar driven by a tall spacer; the real content lives in a
+     full-viewport fixed wrapper that a scroll handler moves with translateY. */
+  #spacer { height: 4000px; }
+  #view { position: fixed; inset: 0; overflow: hidden; }
+  #content { will-change: transform; }
+  #grid { display: block; }
+</style>
+</head>
+<body>
+<div id="spacer"></div>
+<div id="view"><div id="content"><canvas id="grid" width="1200" height="4000"></canvas></div></div>
+<script>
+  const c = document.getElementById("grid");
+  const ctx = c.getContext("2d");
+  for (let cy = 0; cy * 16 < c.height; cy++) {
+    for (let cx = 0; cx * 16 < c.width; cx++) {
+      ctx.fillStyle = `rgb(${(cx + 1) & 255}, ${(cy + 1) & 255}, 64)`;
+      ctx.fillRect(cx * 16, cy * 16, 16, 16);
+    }
+  }
+  // locomotive/lenis-style: translate content by scroll position
+  const content = document.getElementById("content");
+  function update() { content.style.transform = "translateY(" + (-window.scrollY) + "px)"; }
+  window.addEventListener("scroll", update, { passive: true });
+  update();
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>
