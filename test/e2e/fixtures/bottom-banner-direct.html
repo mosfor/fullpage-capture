@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>e2e: document scroller + fixed header + fixed bottom banner</title>
+<style>
+  body { margin: 0; }
+  #grid { position: absolute; top: 0; left: 0; z-index: 0; }
+  /* Fixed header at the top: paints once at the top in the direct render. */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px;
+    background: rgb(0, 0, 255); z-index: 10;
+  }
+  /* Fixed cookie banner at the bottom of the viewport: would paint at the
+     first viewport's bottom, i.e. mid-image — must not appear at all. */
+  #cookie {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 110px;
+    background: rgb(255, 220, 40); z-index: 20;
+  }
+  .spacer { height: 3600px; }
+</style>
+</head>
+<body>
+<canvas id="grid" width="1200" height="3600"></canvas>
+<div id="topbar"></div>
+<div id="cookie"></div>
+<div class="spacer"></div>
+<script>
+  // Position-encoded grid: r = cellX + 1, g = cellY + 1, b = 64.
+  const c = document.getElementById("grid");
+  const ctx = c.getContext("2d");
+  for (let cy = 0; cy * 16 < c.height; cy++) {
+    for (let cx = 0; cx * 16 < c.width; cx++) {
+      ctx.fillStyle = `rgb(${(cx + 1) & 255}, ${(cy + 1) & 255}, 64)`;
+      ctx.fillRect(cx * 16, cy * 16, 16, 16);
+    }
+  }
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>

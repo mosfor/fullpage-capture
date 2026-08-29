@@ -157,6 +157,27 @@
     }
   }
 
+  // Bottom-anchored fixed overlays (cookie banners, chat bubbles, app bars)
+  // look wrong even in the very first frame: they paint at the bottom of the
+  // viewport, which lands mid-image in a full-page capture. Unlike a top
+  // header — correct at the top of frame 0 — these must be hidden before any
+  // tile is captured. Conservative: only elements sitting in the lower half of
+  // the viewport, reaching (near) the viewport bottom, and not so large they
+  // are likely an app wrapper rather than a banner.
+  fpc.findBottomOverlays = function findBottomOverlays() {
+    const vw = document.documentElement.clientWidth;
+    const vh = document.documentElement.clientHeight;
+    return fpc.findFixedElements().filter(({ el, position }) => {
+      if (position !== "fixed") return false;
+      const rect = el.getBoundingClientRect();
+      return (
+        rect.top > vh / 2 &&
+        rect.bottom >= vh - 32 &&
+        rect.width * rect.height < 0.85 * vw * vh
+      );
+    });
+  };
+
   function collectFixedElements(elements) {
     const results = [];
     for (const el of elements) {

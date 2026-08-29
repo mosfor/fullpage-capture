@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>e2e: inner scroll container + fixed header + fixed bottom banner</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: rgb(0, 128, 0); }
+  /* Fixed header at the top: correct in frame 0, must appear exactly once. */
+  #hdr {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px;
+    background: rgb(0, 0, 255); z-index: 10;
+  }
+  /* Inner scroll container fills the viewport below the header. */
+  #container {
+    position: absolute; top: 48px; bottom: 0; left: 0; right: 0;
+    overflow: auto;
+  }
+  .content { position: relative; width: 1000px; height: 3000px; }
+  #grid { position: absolute; top: 0; left: 0; z-index: 0; }
+  /* Fixed cookie banner at the BOTTOM, overlapping the container: must not
+     appear anywhere in the capture, and must hide no content. */
+  #cookie {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 110px;
+    background: rgb(255, 220, 40); z-index: 20;
+  }
+</style>
+</head>
+<body>
+<div id="hdr"></div>
+<div id="container">
+  <div class="content">
+    <canvas id="grid" width="1000" height="3000"></canvas>
+  </div>
+</div>
+<div id="cookie"></div>
+<script>
+  // Position-encoded grid: r = cellX + 1, g = cellY + 1, b = 64.
+  const c = document.getElementById("grid");
+  const ctx = c.getContext("2d");
+  for (let cy = 0; cy * 16 < c.height; cy++) {
+    for (let cx = 0; cx * 16 < c.width; cx++) {
+      ctx.fillStyle = `rgb(${(cx + 1) & 255}, ${(cy + 1) & 255}, 64)`;
+      ctx.fillRect(cx * 16, cy * 16, 16, 16);
+    }
+  }
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>
