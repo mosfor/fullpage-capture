@@ -65,10 +65,14 @@
     // original client height; continue it down to the expanded bottom edge by
     // stretching each side strip's bottom pixel rows (edge clamp). A solid
     // sidebar continues its color and a border continues its lines, without
-    // tiling nav items or distorting text.
-    const extraH = fullHeight - ch.clientH;
-    const edge = Math.min(2, ch.clientH);
-    if (extraH > 0 && edge > 0) {
+    // tiling nav items or distorting text. The first frame only covers the
+    // viewport, so when the container's client bottom sits below it, sample
+    // the lowest strip rows actually on screen and start the continuation
+    // there (the strip draw above was source-clipped at the same line).
+    const stripBottom = Math.min(ch.top + ch.clientH, ch.vh);
+    const contH = ch.top + fullHeight - stripBottom;
+    const edge = Math.min(2, stripBottom - Math.max(ch.top, 0));
+    if (contH > 0 && edge > 0) {
       const sides = [
         [0, ch.left, 0],
         [ch.left + ch.clientW, ch.vw - ch.left - ch.clientW, ch.left + fullWidth],
@@ -76,8 +80,8 @@
       for (const [sx, w, dx] of sides) {
         if (w > 0) {
           ctx.drawImage(img,
-            sx * dpr, (ch.top + ch.clientH - edge) * dpr, w * dpr, edge * dpr,
-            dx * scale, (ch.top + ch.clientH) * scale, w * scale, extraH * scale);
+            sx * dpr, (stripBottom - edge) * dpr, w * dpr, edge * dpr,
+            dx * scale, stripBottom * scale, w * scale, contH * scale);
         }
       }
     }

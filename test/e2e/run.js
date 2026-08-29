@@ -366,6 +366,17 @@ async function capture(driver, url) {
     checkGrid(png, "lazy", 800, 2300);
     checkGrid(png, "lazy", 600, 3560);
 
+    // --- fixture 12: container client bottom below the viewport ---
+    console.log("fixture: inner-tall.html (container taller than viewport, clamp source on screen)");
+    png = await capture(driver, `http://127.0.0.1:${PORT}/inner-tall.html`);
+    m = await containerMetrics(driver);
+    check("inner-tall container client bottom is below viewport", m.top + m.ch > m.vh,
+      `top=${m.top} ch=${m.ch} vh=${m.vh}`);
+    check("inner-tall left border continues below viewport boundary",
+      near(px(png, m.left - 5, m.vh + 100), [0, 0, 0]), `got ${px(png, m.left - 5, m.vh + 100)}`);
+    check("inner-tall left border continues to bottom of canvas",
+      near(px(png, m.left - 5, png.height - 30), [0, 0, 0]), `got ${px(png, m.left - 5, png.height - 30)}`);
+
     // --- fixture 13: RTL dashboard with solid sidebar chrome ---
     console.log("fixture: rtl-dash.html (RTL sidebar chrome continues full height)");
     png = await capture(driver, `http://127.0.0.1:${PORT}/rtl-dash.html`);
