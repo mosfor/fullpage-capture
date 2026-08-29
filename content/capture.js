@@ -18,7 +18,10 @@
   async function triggerLazyLoad(dims, fromY = 0) {
     const { fullHeight, viewportHeight } = dims;
     const step = Math.max(viewportHeight, fullHeight / 40);
-    for (let y = fromY + step; y < fullHeight; y += step) {
+    // Start AT fromY (not fromY + step): the viewport must cover the start of
+    // a newly appended region too, and when growth is shorter than one step
+    // the loop would otherwise not scroll at all.
+    for (let y = fromY; y < fullHeight; y += step) {
       fpc.scroll(0, Math.min(y, fullHeight - viewportHeight));
       await fpc.nextPaint();
       await fpc.sleep(40);

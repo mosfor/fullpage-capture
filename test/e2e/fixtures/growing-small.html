@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>e2e: page grows by less than one viewport step</title>
+<style>
+  html, body { margin: 0; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script>
+  // Growth SMALLER than one lazy-load pre-pass step (400px < viewport
+  // height): a 400px tail is appended blank when the viewport nears the
+  // bottom and paints its grid only once it actually scrolls into view.
+  // The repeat sweep must therefore scroll the start of the newly appended
+  // region into the viewport, or the capture shows a blank tail even at the
+  // correct grown height. Grid encoding matches run.js cellProbe:
+  // r = cellX + 1, g = cellY + 1, b = 64, in absolute page coordinates.
+  const INITIAL_H = 2400;
+  const TAIL_H = 400;
+
+  function paintGrid(c, offsetY) {
+    const ctx = c.getContext("2d");
+    for (let cy = 0; cy * 16 < c.height; cy++) {
+      for (let cx = 0; cx * 16 < c.width; cx++) {
+        const absCy = cy + offsetY / 16;
+        ctx.fillStyle = `rgb(${(cx + 1) & 255}, ${(absCy + 1) & 255}, 64)`;
+        ctx.fillRect(cx * 16, cy * 16, 16, 16);
+      }
+    }
+  }
+
+  const first = document.createElement("canvas");
+  first.width = 1200;
+  first.height = INITIAL_H;
+  paintGrid(first, 0);
+  document.body.appendChild(first);
+
+  let tail = null;
+  let tailPainted = false;
+  window.addEventListener("scroll", () => {
+    const seen = window.scrollY + window.innerHeight;
+    if (!tail && seen > document.body.scrollHeight - 800) {
+      tail = document.createElement("canvas");
+      tail.width = 1200;
+      tail.height = TAIL_H;
+      document.body.appendChild(tail); // appended blank
+    }
+    // Lazy paint: only once the tail is actually visible.
+    if (tail && !tailPainted && seen > INITIAL_H + 40) {
+      tailPainted = true;
+      paintGrid(tail, INITIAL_H);
+    }
+  }, { passive: true });
+
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>

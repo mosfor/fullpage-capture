@@ -225,6 +225,15 @@ async function capture(driver, url) {
     const grown = await driver.executeScript("return document.body.scrollHeight");
     check("growing: fixture grew to 7200", grown === 7200, `got ${grown}`);
 
+    // --- fixture 7: growth smaller than one pre-pass step, tail paints its
+    // grid lazily on visibility -> repeat sweep must reach the region start ---
+    console.log("fixture: growing-small.html (growth < one step, lazy-painted tail)");
+    png = await capture(driver, `http://127.0.0.1:${PORT}/growing-small.html`);
+    check("growing-small height = 2800 (grown), not initial 2400", png.height === 2800, `got ${png.height}`);
+    checkGrid(png, "growing-small", 600, 2200);  // initial content
+    checkGrid(png, "growing-small", 600, 2450);  // start of lazy tail
+    checkGrid(png, "growing-small", 900, 2760);  // near the grown bottom
+
     console.log(failures.length === 0
       ? "\nALL E2E CHECKS PASSED"
       : `\n${failures.length} CHECK(S) FAILED:\n - ` + failures.join("\n - "));
