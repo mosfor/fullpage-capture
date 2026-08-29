@@ -30,15 +30,11 @@
     const vh = document.documentElement.clientHeight;
     const sampleXs = [8, vw / 2, Math.max(8, vw - 8)];
     const sampleYs = [8, 48, 96, vh / 2, Math.max(8, vh - 8)];
+    const visitedRoots = new Set();
     for (const x of sampleXs) {
       for (const y of sampleYs) {
-        for (const el of document.elementsFromPoint(x, y)) {
-          let cur = el;
-          while (cur && cur !== document.body) {
-            if (cur.nodeType === Node.ELEMENT_NODE) candidates.add(cur);
-            cur = cur.parentElement;
-          }
-        }
+        visitedRoots.clear();
+        collectFromPoint(document, x, y, candidates, visitedRoots, 0);
       }
     }
 
@@ -59,6 +55,37 @@
 
     return results;
   };
+
+  // Sample a point in a document or shadow root: add the hit elements and
+  // their ancestors as candidates, and recurse into any open shadow roots
+  // among them. document.elementsFromPoint() retargets hits inside shadow
+  // trees to the shadow HOST (whose computed position usually isn't
+  // fixed/sticky), so overlays inside shadow DOM would otherwise be missed.
+  // Closed shadow roots stay unreachable by design. Depth-capped and
+  // visited-guarded against pathological/self-referential trees.
+  const MAX_SHADOW_DEPTH = 8;
+  function collectFromPoint(root, x, y, candidates, visitedRoots, depth) {
+    if (depth > MAX_SHADOW_DEPTH || visitedRoots.has(root)) return;
+    visitedRoots.add(root);
+    let hits;
+    try {
+      hits = root.elementsFromPoint(x, y);
+    } catch (e) {
+      return;
+    }
+    for (const el of hits) {
+      let cur = el;
+      while (cur && cur !== document.body) {
+        if (cur.nodeType === Node.ELEMENT_NODE) {
+          candidates.add(cur);
+          if (cur.shadowRoot) {
+            collectFromPoint(cur.shadowRoot, x, y, candidates, visitedRoots, depth + 1);
+          }
+        }
+        cur = cur.parentElement;
+      }
+    }
+  }
 
   function collectFixedElements(elements) {
     const results = [];

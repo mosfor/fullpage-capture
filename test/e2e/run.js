@@ -159,6 +159,33 @@ async function capture(driver, url) {
     checkGrid(png, "rerender", 550, 1500, m.left, m.top);
     checkGrid(png, "rerender", 1050, 2900, m.left, m.top);
 
+    // --- fixture 4: sticky bar inside an open shadow root -> stitch path ---
+    console.log("fixture: shadow-sticky.html (sticky inside open shadow root, stitch path)");
+    png = await capture(driver, `http://127.0.0.1:${PORT}/shadow-sticky.html`);
+    m = await containerMetrics(driver);
+    expW = m.vw - m.cw + m.sw;
+    expH = m.vh - m.ch + m.sh;
+    check(`shadow size = ${expW}x${expH}`,
+      png.width === Math.round(expW) && png.height === Math.round(expH),
+      `got ${png.width}x${png.height}`);
+    check("shadow chrome marker painted once", near(px(png, 10, 10), [255, 0, 255]), `got ${px(png, 10, 10)}`);
+    check("shadow sticky painted once (top)",
+      near(px(png, m.left + 75, m.top + 60), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 60)}`);
+    check("shadow sticky not repeated (tile 2)",
+      !near(px(png, m.left + 75, m.top + 1000), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 1000)}`);
+    check("shadow sticky not repeated (tile 3)",
+      !near(px(png, m.left + 75, m.top + 1500), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 1500)}`);
+    check("shadow sticky not repeated (deep)",
+      !near(px(png, m.left + 75, m.top + 2700), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 2700)}`);
+    checkGrid(png, "shadow", 500, 200, m.left, m.top);
+    checkGrid(png, "shadow", 500, 1400, m.left, m.top);
+    checkGrid(png, "shadow", 500, 2900, m.left, m.top);
+    checkGrid(png, "shadow", 900, 2000, m.left, m.top);  // right of clientWidth: horizontal stitch
+    const restored4 = await driver.executeScript(
+      `const r = document.getElementById("host").shadowRoot;
+       return { sticky: getComputedStyle(r.querySelector(".z8p")).position };`);
+    check("shadow: sticky restored", restored4.sticky === "sticky", JSON.stringify(restored4));
+
     console.log(failures.length === 0
       ? "\nALL E2E CHECKS PASSED"
       : `\n${failures.length} CHECK(S) FAILED:\n - ` + failures.join("\n - "));
