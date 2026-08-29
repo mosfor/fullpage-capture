@@ -75,11 +75,22 @@
     const sampleXs = [8, vw / 2, Math.max(8, vw - 8)];
     const sampleYs = [8, 48, 96, vh / 2, Math.max(8, vh - 8)];
     const visitedRoots = new Set();
+    const sampleAt = (x, y) => {
+      visitedRoots.clear();
+      collectFromPoint(document, x, y, candidates, visitedRoots, 0);
+    };
     for (const x of sampleXs) {
-      for (const y of sampleYs) {
-        visitedRoots.clear();
-        collectFromPoint(document, x, y, candidates, visitedRoots, 0);
-      }
+      for (const y of sampleYs) sampleAt(x, y);
+    }
+
+    // Bottom-anchored widgets (chat bubbles, consent toasts) are often narrow
+    // and off-center, slipping between the coarse x samples above — and the
+    // full-DOM fallback below never runs once any other fixed element was
+    // found. Sample a denser row of points along the bottom edge.
+    for (let i = 1; i < 16; i++) {
+      const x = (vw * i) / 16;
+      sampleAt(x, Math.max(8, vh - 8));
+      sampleAt(x, Math.max(8, vh - 40));
     }
 
     // Add likely semantic/header nodes. This is bounded and avoids
@@ -156,6 +167,28 @@
       if (el.shadowRoot) collectSubtree(el.shadowRoot, out, budget, depth + 1);
     }
   }
+
+  // Bottom-anchored fixed overlays (cookie banners, chat bubbles, app bars)
+  // look wrong even in the very first frame: they paint at the bottom of the
+  // viewport, which lands mid-image in a full-page capture. Unlike a top
+  // header — correct at the top of frame 0 — these must be hidden before any
+  // tile is captured. Conservative: only elements sitting in the lower half of
+  // the viewport, reaching (near) the viewport bottom, and not so large they
+  // are likely an app wrapper rather than a banner (full-viewport fixed
+  // wrappers are already exempted upstream in collectFixedElements; the
+  // shared coversViewport check keeps that guarantee local too).
+  fpc.findBottomOverlays = function findBottomOverlays() {
+    const vh = document.documentElement.clientHeight;
+    return fpc.findFixedElements().filter(({ el, position }) => {
+      if (position !== "fixed") return false;
+      const rect = el.getBoundingClientRect();
+      return (
+        rect.top > vh / 2 &&
+        rect.bottom >= vh - 32 &&
+        !coversViewport(rect)
+      );
+    });
+  };
 
   function collectFixedElements(elements) {
     const results = [];

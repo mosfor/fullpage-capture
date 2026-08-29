@@ -91,6 +91,10 @@
 
       fpc.scroll(0, 0);
       await fpc.awaitScroll(0, 0);
+      // Top fixed headers paint exactly once at the top in a direct render —
+      // correct. Bottom-anchored overlays (cookie banners) would paint at the
+      // first viewport's bottom, i.e. mid-image, occluding content: hide them.
+      fpc.hideFixed(fpc.findBottomOverlays());
       await fpc.waitForCaptureReady();
 
       const res = await browser.runtime.sendMessage({
@@ -101,6 +105,7 @@
       if (!res.success) throw new Error(res.error);
       return res.dataUrl;
     } finally {
+      fpc.restoreFixed();
       fpc.restoreScrollEffects();
       fpc.scroll(dims.scrollX, dims.scrollY);
     }
@@ -143,6 +148,12 @@
     fpc.disableScrollEffects();
     fpc.scroll(0, 0);
     await fpc.awaitScroll(0, 0);
+
+    // Bottom-anchored fixed overlays (cookie banners) sit at the bottom of the
+    // first viewport, which is the middle of the output — hide them before the
+    // first tile. Top headers/sticky stay visible in row 0 (correct there) and
+    // are neutralized from row 1 as before.
+    fpc.hideFixed(fpc.findBottomOverlays());
 
     // When an inner container scrolls, keep the chrome around it (sidebar,
     // header, footer) in the output: draw it once from the first frame and
@@ -203,6 +214,11 @@
               console.debug("[FullPage Capture] neutralizing fixed/sticky elements:", found);
             }
             fpc.hideFixed(found);
+          } else {
+            // Bottom overlays are hidden before the loop, but a scroll-driven
+            // re-render during row 0 (horizontal tiles) can recreate them —
+            // re-hide per tile. hideFixed is idempotent per node.
+            fpc.hideFixed(fpc.findBottomOverlays());
           }
           await fpc.waitForCaptureReady();
 
@@ -312,6 +328,10 @@
     fpc.scroll(0, 0);
     await fpc.awaitScroll(0, 0);
 
+    // Same rationale as captureFullPage: bottom-anchored overlays occlude
+    // content in every tile, including the first row.
+    fpc.hideFixed(fpc.findBottomOverlays());
+
     const startCol = Math.floor(selX / viewportWidth);
     const endCol = Math.ceil((selX + selW) / viewportWidth);
     const startRow = Math.floor(selY / viewportHeight);
@@ -329,6 +349,7 @@
           await fpc.awaitScroll(clampedX, clampedY);
           // Re-detect per tile — see captureFullPage for rationale.
           if (row > startRow) fpc.hideFixed(fpc.findFixedElements());
+          else fpc.hideFixed(fpc.findBottomOverlays());
           await fpc.waitForCaptureReady();
 
           const res = await browser.runtime.sendMessage({

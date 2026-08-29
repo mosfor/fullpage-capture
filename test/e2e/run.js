@@ -60,6 +60,17 @@ function check(name, ok, detail) {
   if (!ok) failures.push(name);
 }
 
+// Scan the whole output for a distinctive color (e.g. a fixed banner that
+// must not have been baked in anywhere). Returns the first hit or null.
+function findColor(png, color, tol = 6) {
+  for (let y = 0; y < png.height; y++) {
+    for (let x = 0; x < png.width; x++) {
+      if (near(px(png, x, y), color, tol)) return { x, y };
+    }
+  }
+  return null;
+}
+
 function checkGrid(png, name, x, y, ox = 0, oy = 0) {
   const p = cellProbe(x, y);
   const got = px(png, ox + p.x, oy + p.y);
@@ -252,6 +263,69 @@ async function capture(driver, url) {
       'return { scrollY: window.scrollY, viewVisibility: getComputedStyle(document.getElementById("view")).visibility }');
     check("transform-scroll: page state restored",
       restored8.scrollY === 0 && restored8.viewVisibility === "visible", JSON.stringify(restored8));
+
+    // --- fixture 9: fixed bottom banner over inner container -> stitch path.
+    // The banner node is recreated on every scroll (SPA-style), including the
+    // horizontal scrolls within tile row 0, and a narrow off-center chat
+    // widget sits between the coarse viewport sample points. ---
+    console.log("fixture: bottom-banner.html (fixed header + bottom banner, stitch path)");
+    const BANNER = [255, 220, 40];
+    const CHAT = [180, 40, 220];
+    png = await capture(driver, `http://127.0.0.1:${PORT}/bottom-banner.html`);
+    m = await containerMetrics(driver);
+    expW = m.vw - m.cw + m.sw;
+    expH = m.vh - m.ch + m.sh;
+    check(`banner-stitch size = ${expW}x${expH}`,
+      png.width === Math.round(expW) && png.height === Math.round(expH),
+      `got ${png.width}x${png.height}`);
+    check("banner-stitch header painted once (top)",
+      near(px(png, 600, 20), [0, 0, 255]), `got ${px(png, 600, 20)}`);
+    let hit = findColor(png, BANNER);
+    check("banner-stitch banner absent everywhere (incl. recreated in row 0)",
+      hit === null, `found at ${JSON.stringify(hit)}`);
+    hit = findColor(png, CHAT);
+    check("banner-stitch narrow chat widget absent everywhere",
+      hit === null, `found at ${JSON.stringify(hit)}`);
+    // Grid cells under the banner's frame-0 screen position (bottom 110px of
+    // the container in the first tile) must be intact.
+    checkGrid(png, "banner-stitch", 500, m.ch - 60, m.left, m.top);
+    checkGrid(png, "banner-stitch", 500, m.ch - 20, m.left, m.top);
+    // ...and under the chat widget's frame-0 position (off-center right).
+    checkGrid(png, "banner-stitch", m.cw - 250, m.ch - 60, m.left, m.top);
+    // ...and in the second horizontal tile of row 0, where the recreated
+    // banner would have been baked in.
+    checkGrid(png, "banner-stitch", 1800, m.ch - 60, m.left, m.top);
+    checkGrid(png, "banner-stitch", 500, 200, m.left, m.top);
+    checkGrid(png, "banner-stitch", 500, 2900, m.left, m.top);
+    checkGrid(png, "banner-stitch", 1800, 2000, m.left, m.top);
+    const restored9 = await driver.executeScript(
+      'return { vis: getComputedStyle(document.getElementById("cookie")).visibility }');
+    check("banner-stitch: banner restored after capture", restored9.vis === "visible",
+      JSON.stringify(restored9));
+
+    // --- fixture 10: fixed bottom banner on a document scroller -> direct path ---
+    console.log("fixture: bottom-banner-direct.html (fixed header + bottom banner, direct path)");
+    png = await capture(driver, `http://127.0.0.1:${PORT}/bottom-banner-direct.html`);
+    const vh5 = await driver.executeScript("return document.documentElement.clientHeight");
+    check("banner-direct height = 3600", png.height === 3600, `got ${png.height}`);
+    check("banner-direct header painted once (top)",
+      near(px(png, 600, 20), [0, 0, 255]), `got ${px(png, 600, 20)}`);
+    check("banner-direct header not repeated below fold",
+      !near(px(png, 600, vh5 + 20), [0, 0, 255]), `got ${px(png, 600, vh5 + 20)}`);
+    hit = findColor(png, BANNER);
+    check("banner-direct banner absent everywhere", hit === null, `found at ${JSON.stringify(hit)}`);
+    hit = findColor(png, CHAT);
+    check("banner-direct narrow chat widget absent everywhere",
+      hit === null, `found at ${JSON.stringify(hit)}`);
+    // Grid cells under the banner's frame-0 position (bottom of first viewport).
+    checkGrid(png, "banner-direct", 600, vh5 - 60);
+    checkGrid(png, "banner-direct", 600, vh5 - 20);
+    checkGrid(png, "banner-direct", 600, 1500);
+    checkGrid(png, "banner-direct", 600, 3560);
+    const restored10 = await driver.executeScript(
+      'return { scrollY: window.scrollY, vis: getComputedStyle(document.getElementById("cookie")).visibility }');
+    check("banner-direct: page state restored", restored10.scrollY === 0 && restored10.vis === "visible",
+      JSON.stringify(restored10));
 
     console.log(failures.length === 0
       ? "\nALL E2E CHECKS PASSED"
