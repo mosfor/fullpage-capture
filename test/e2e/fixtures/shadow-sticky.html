@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>e2e: sticky inside open shadow root, inner scroll container</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: rgb(0, 128, 0); }
+  /* chrome outside the container: must appear exactly once in the output */
+  #marker {
+    position: absolute; top: 0; left: 0;
+    width: 24px; height: 24px; background: rgb(255, 0, 255);
+  }
+  .xk9 {
+    position: absolute; top: 60px; left: 40px;
+    width: 800px; height: 500px;
+    overflow: auto; border: 10px solid #000;
+  }
+</style>
+</head>
+<body>
+<div id="marker"></div>
+<div class="xk9" id="container">
+  <div id="host"></div>
+</div>
+<script>
+  // The sticky bar and the grid both live inside an open shadow root.
+  // Class names are deliberately meaningless: light-DOM selector scans
+  // cannot see into the shadow tree anyway, and detection must work via
+  // shadow-piercing point sampling.
+  const root = document.getElementById("host").attachShadow({ mode: "open" });
+  root.innerHTML = `
+    <style>
+      .q2w { position: relative; width: 1000px; height: 3000px; }
+      canvas { position: absolute; top: 0; left: 0; z-index: 0; }
+      .z8p { position: sticky; top: 0; z-index: 1;
+             width: 1000px; height: 120px; background: rgb(255, 0, 0); }
+    </style>
+    <div class="q2w">
+      <canvas width="1000" height="3000"></canvas>
+      <div class="z8p"></div>
+    </div>
+  `;
+  const c = root.querySelector("canvas");
+  const ctx = c.getContext("2d");
+  for (let cy = 0; cy * 16 < c.height; cy++) {
+    for (let cx = 0; cx * 16 < c.width; cx++) {
+      ctx.fillStyle = `rgb(${(cx + 1) & 255}, ${(cy + 1) & 255}, 64)`;
+      ctx.fillRect(cx * 16, cy * 16, 16, 16);
+    }
+  }
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>

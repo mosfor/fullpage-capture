@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>e2e: narrow off-center sticky inside open shadow root (full-scan path)</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: rgb(0, 128, 0); }
+  #marker {
+    position: absolute; top: 0; left: 0;
+    width: 24px; height: 24px; background: rgb(255, 0, 255);
+  }
+  .xk9 {
+    position: absolute; top: 60px; left: 40px;
+    width: 800px; height: 500px;
+    overflow: auto; border: 10px solid #000;
+  }
+</style>
+</head>
+<body>
+<div id="marker"></div>
+<div class="xk9" id="container">
+  <div id="host"></div>
+</div>
+<script>
+  // A NARROW (40px) sticky element inside an open shadow root, positioned
+  // so that it misses every viewport sample point (sampleXs are 8, vw/2,
+  // vw-8; this sits at viewport x ~350..390). Detection must come from the
+  // small-page full-scan fallback descending into the shadow root.
+  const root = document.getElementById("host").attachShadow({ mode: "open" });
+  root.innerHTML = `
+    <style>
+      .q2w { position: relative; width: 1000px; height: 3000px; }
+      canvas { position: absolute; top: 0; left: 0; z-index: 0; }
+      .n4q { position: sticky; top: 0; z-index: 1;
+             margin-left: 300px; width: 40px; height: 120px;
+             background: rgb(255, 0, 0); }
+    </style>
+    <div class="q2w">
+      <canvas width="1000" height="3000"></canvas>
+      <div class="n4q"></div>
+    </div>
+  `;
+  const c = root.querySelector("canvas");
+  const ctx = c.getContext("2d");
+  for (let cy = 0; cy * 16 < c.height; cy++) {
+    for (let cx = 0; cx * 16 < c.width; cx++) {
+      ctx.fillStyle = `rgb(${(cx + 1) & 255}, ${(cy + 1) & 255}, 64)`;
+      ctx.fillRect(cx * 16, cy * 16, 16, 16);
+    }
+  }
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>
