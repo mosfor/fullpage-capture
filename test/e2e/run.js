@@ -213,6 +213,18 @@ async function capture(driver, url) {
        return { sticky: getComputedStyle(r.querySelector(".n4q")).position };`);
     check("shadow-narrow: sticky restored", restored5.sticky === "sticky", JSON.stringify(restored5));
 
+    // --- fixture 6: page appends content when scrolled -> direct path must
+    // re-measure after the lazy-load pre-pass, not capture the stale height ---
+    console.log("fixture: growing.html (content appended on scroll, direct render path)");
+    png = await capture(driver, `http://127.0.0.1:${PORT}/growing.html`);
+    check("growing height = 7200 (grown), not initial 2400", png.height === 7200, `got ${png.height}`);
+    checkGrid(png, "growing", 600, 200);    // initial segment
+    checkGrid(png, "growing", 600, 3000);   // first appended segment
+    checkGrid(png, "growing", 900, 5200);   // second appended segment
+    checkGrid(png, "growing", 600, 7160);   // near the final, grown bottom
+    const grown = await driver.executeScript("return document.body.scrollHeight");
+    check("growing: fixture grew to 7200", grown === 7200, `got ${grown}`);
+
     console.log(failures.length === 0
       ? "\nALL E2E CHECKS PASSED"
       : `\n${failures.length} CHECK(S) FAILED:\n - ` + failures.join("\n - "));
