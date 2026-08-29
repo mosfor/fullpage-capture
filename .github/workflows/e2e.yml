@@ -1,0 +1,23 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Lint extension
+        run: npx --yes web-ext lint --ignore-files 'test/**'
+      - name: Install e2e deps
+        working-directory: test/e2e
+        run: npm ci
+      - name: Run e2e (headless Firefox)
+        working-directory: test/e2e
+        run: node run.js

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>e2e: inner scroll container</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  /* Hashed-style class names on purpose: detection must not rely on
+     semantic names, and sticky handling must not rely on selectors. */
+  .xk9 {
+    position: absolute; top: 60px; left: 40px;
+    width: 800px; height: 500px;
+    overflow: auto; border: 10px solid #000;
+  }
+  .q2w { position: relative; width: 1000px; height: 3000px; }
+  #grid { position: absolute; top: 0; left: 0; z-index: 0; }
+  #innersticky {
+    position: sticky; top: 0; z-index: 1;
+    width: 150px; height: 120px; background: rgb(255, 0, 0);
+  }
+</style>
+</head>
+<body>
+<div class="xk9" id="container">
+  <div class="q2w">
+    <canvas id="grid" width="1000" height="3000"></canvas>
+    <div id="innersticky"></div>
+  </div>
+</div>
+<script>
+  const c = document.getElementById("grid");
+  const ctx = c.getContext("2d");
+  for (let cy = 0; cy * 16 < c.height; cy++) {
+    for (let cx = 0; cx * 16 < c.width; cx++) {
+      ctx.fillStyle = `rgb(${(cx + 1) & 255}, ${(cy + 1) & 255}, 64)`;
+      ctx.fillRect(cx * 16, cy * 16, 16, 16);
+    }
+  }
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>
