@@ -214,6 +214,11 @@
               console.debug("[FullPage Capture] neutralizing fixed/sticky elements:", found);
             }
             fpc.hideFixed(found);
+          } else {
+            // Bottom overlays are hidden before the loop, but a scroll-driven
+            // re-render during row 0 (horizontal tiles) can recreate them —
+            // re-hide per tile. hideFixed is idempotent per node.
+            fpc.hideFixed(fpc.findBottomOverlays());
           }
           await fpc.waitForCaptureReady();
 
@@ -344,6 +349,7 @@
           await fpc.awaitScroll(clampedX, clampedY);
           // Re-detect per tile — see captureFullPage for rationale.
           if (row > startRow) fpc.hideFixed(fpc.findFixedElements());
+          else fpc.hideFixed(fpc.findBottomOverlays());
           await fpc.waitForCaptureReady();
 
           const res = await browser.runtime.sendMessage({

@@ -264,9 +264,13 @@ async function capture(driver, url) {
     check("transform-scroll: page state restored",
       restored8.scrollY === 0 && restored8.viewVisibility === "visible", JSON.stringify(restored8));
 
-    // --- fixture 9: fixed bottom banner over inner container -> stitch path ---
+    // --- fixture 9: fixed bottom banner over inner container -> stitch path.
+    // The banner node is recreated on every scroll (SPA-style), including the
+    // horizontal scrolls within tile row 0, and a narrow off-center chat
+    // widget sits between the coarse viewport sample points. ---
     console.log("fixture: bottom-banner.html (fixed header + bottom banner, stitch path)");
     const BANNER = [255, 220, 40];
+    const CHAT = [180, 40, 220];
     png = await capture(driver, `http://127.0.0.1:${PORT}/bottom-banner.html`);
     m = await containerMetrics(driver);
     expW = m.vw - m.cw + m.sw;
@@ -277,13 +281,23 @@ async function capture(driver, url) {
     check("banner-stitch header painted once (top)",
       near(px(png, 600, 20), [0, 0, 255]), `got ${px(png, 600, 20)}`);
     let hit = findColor(png, BANNER);
-    check("banner-stitch banner absent everywhere", hit === null, `found at ${JSON.stringify(hit)}`);
+    check("banner-stitch banner absent everywhere (incl. recreated in row 0)",
+      hit === null, `found at ${JSON.stringify(hit)}`);
+    hit = findColor(png, CHAT);
+    check("banner-stitch narrow chat widget absent everywhere",
+      hit === null, `found at ${JSON.stringify(hit)}`);
     // Grid cells under the banner's frame-0 screen position (bottom 110px of
     // the container in the first tile) must be intact.
     checkGrid(png, "banner-stitch", 500, m.ch - 60, m.left, m.top);
     checkGrid(png, "banner-stitch", 500, m.ch - 20, m.left, m.top);
+    // ...and under the chat widget's frame-0 position (off-center right).
+    checkGrid(png, "banner-stitch", m.cw - 250, m.ch - 60, m.left, m.top);
+    // ...and in the second horizontal tile of row 0, where the recreated
+    // banner would have been baked in.
+    checkGrid(png, "banner-stitch", 1800, m.ch - 60, m.left, m.top);
     checkGrid(png, "banner-stitch", 500, 200, m.left, m.top);
     checkGrid(png, "banner-stitch", 500, 2900, m.left, m.top);
+    checkGrid(png, "banner-stitch", 1800, 2000, m.left, m.top);
     const restored9 = await driver.executeScript(
       'return { vis: getComputedStyle(document.getElementById("cookie")).visibility }');
     check("banner-stitch: banner restored after capture", restored9.vis === "visible",
@@ -300,6 +314,9 @@ async function capture(driver, url) {
       !near(px(png, 600, vh5 + 20), [0, 0, 255]), `got ${px(png, 600, vh5 + 20)}`);
     hit = findColor(png, BANNER);
     check("banner-direct banner absent everywhere", hit === null, `found at ${JSON.stringify(hit)}`);
+    hit = findColor(png, CHAT);
+    check("banner-direct narrow chat widget absent everywhere",
+      hit === null, `found at ${JSON.stringify(hit)}`);
     // Grid cells under the banner's frame-0 position (bottom of first viewport).
     checkGrid(png, "banner-direct", 600, vh5 - 60);
     checkGrid(png, "banner-direct", 600, vh5 - 20);

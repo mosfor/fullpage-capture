@@ -17,6 +17,12 @@
     position: fixed; bottom: 0; left: 0; right: 0; height: 110px;
     background: rgb(255, 220, 40); z-index: 20;
   }
+  /* Narrow, off-center fixed bottom widget (chat bubble): sits between the
+     coarse viewport sample points, must still be found and hidden. */
+  #chat {
+    position: fixed; bottom: 16px; right: 200px; width: 90px; height: 90px;
+    background: rgb(180, 40, 220); z-index: 20;
+  }
   .spacer { height: 3600px; }
 </style>
 </head>
@@ -24,6 +30,7 @@
 <canvas id="grid" width="1200" height="3600"></canvas>
 <div id="topbar"></div>
 <div id="cookie"></div>
+<div id="chat"></div>
 <div class="spacer"></div>
 <script>
   // Position-encoded grid: r = cellX + 1, g = cellY + 1, b = 64.

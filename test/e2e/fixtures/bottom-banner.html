@@ -16,13 +16,21 @@
     position: absolute; top: 48px; bottom: 0; left: 0; right: 0;
     overflow: auto;
   }
-  .content { position: relative; width: 1000px; height: 3000px; }
+  /* Wider than the viewport so row 0 has multiple horizontal tiles. */
+  .content { position: relative; width: 2000px; height: 3000px; }
   #grid { position: absolute; top: 0; left: 0; z-index: 0; }
   /* Fixed cookie banner at the BOTTOM, overlapping the container: must not
-     appear anywhere in the capture, and must hide no content. */
+     appear anywhere in the capture, and must hide no content. Recreated on
+     every scroll (SPA-style) — see script below. */
   #cookie {
     position: fixed; bottom: 0; left: 0; right: 0; height: 110px;
     background: rgb(255, 220, 40); z-index: 20;
+  }
+  /* Narrow, off-center fixed bottom widget (chat bubble): sits between the
+     coarse viewport sample points, must still be found and hidden. */
+  #chat {
+    position: fixed; bottom: 16px; right: 200px; width: 90px; height: 90px;
+    background: rgb(180, 40, 220); z-index: 20;
   }
 </style>
 </head>
@@ -30,10 +38,22 @@
 <div id="hdr"></div>
 <div id="container">
   <div class="content">
-    <canvas id="grid" width="1000" height="3000"></canvas>
+    <canvas id="grid" width="2000" height="3000"></canvas>
   </div>
 </div>
 <div id="cookie"></div>
+<div id="chat"></div>
+<script>
+  // SPA-style re-render: replace the cookie banner node on every scroll of
+  // the inner container, including horizontal scrolls within tile row 0.
+  document.getElementById("container").addEventListener("scroll", () => {
+    const old = document.getElementById("cookie");
+    if (old) old.remove();
+    const n = document.createElement("div");
+    n.id = "cookie";
+    document.body.appendChild(n);
+  });
+</script>
 <script>
   // Position-encoded grid: r = cellX + 1, g = cellY + 1, b = 64.
   const c = document.getElementById("grid");
