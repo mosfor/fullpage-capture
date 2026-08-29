@@ -50,7 +50,9 @@
 
     // Preserve old behavior on small pages. Skip full scans on large DOMs.
     if (results.length === 0 && document.getElementsByTagName("*").length <= 2000) {
-      return collectFixedElements(document.querySelectorAll("*"));
+      const all = [];
+      collectSubtree(document, all, { shadowCount: 0 }, 0);
+      return collectFixedElements(all);
     }
 
     return results;
@@ -84,6 +86,30 @@
         }
         cur = cur.parentElement;
       }
+    }
+  }
+
+  // Full-scan fallback helper: enumerate a root's elements and descend into
+  // any open shadow roots. The ≤2000 light-DOM-node gate above keeps the
+  // light tree cheap; shadow trees are additionally bounded by
+  // MAX_SHADOW_SCAN_NODES total shadow elements (plus the shared depth cap)
+  // so a huge web-component tree cannot blow up the scan.
+  const MAX_SHADOW_SCAN_NODES = 2000;
+  function collectSubtree(root, out, budget, depth) {
+    if (depth > MAX_SHADOW_DEPTH) return;
+    let els;
+    try {
+      els = root.querySelectorAll("*");
+    } catch (e) {
+      return;
+    }
+    for (const el of els) {
+      if (depth > 0) {
+        if (budget.shadowCount >= MAX_SHADOW_SCAN_NODES) return;
+        budget.shadowCount++;
+      }
+      out.push(el);
+      if (el.shadowRoot) collectSubtree(el.shadowRoot, out, budget, depth + 1);
     }
   }
 
