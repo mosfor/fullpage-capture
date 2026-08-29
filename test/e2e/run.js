@@ -60,10 +60,23 @@ function check(name, ok, detail) {
   if (!ok) failures.push(name);
 }
 
-function checkGrid(png, name, x, y) {
+function checkGrid(png, name, x, y, ox = 0, oy = 0) {
   const p = cellProbe(x, y);
-  const got = px(png, p.x, p.y);
+  const got = px(png, ox + p.x, oy + p.y);
   check(`${name} grid@(${p.x},${p.y})`, near(got, p.color), `expected rgb(${p.color}) got rgb(${got})`);
+}
+
+// Container metrics needed to locate the expanded container inside the
+// chrome-preserving output.
+function containerMetrics(driver) {
+  return driver.executeScript(`
+    const el = document.getElementById("container");
+    const r = el.getBoundingClientRect();
+    return {
+      vw: document.documentElement.clientWidth, vh: document.documentElement.clientHeight,
+      left: Math.round(r.left + el.clientLeft), top: Math.round(r.top + el.clientTop),
+      cw: el.clientWidth, ch: el.clientHeight, sw: el.scrollWidth, sh: el.scrollHeight,
+    };`);
 }
 
 // ---------- capture via test hook ----------
@@ -105,14 +118,23 @@ async function capture(driver, url) {
     // --- fixture 2: bordered inner scroll container -> stitch path ---
     console.log("fixture: inner.html (bordered inner container, stitch path)");
     png = await capture(driver, `http://127.0.0.1:${PORT}/inner.html`);
-    check("inner size = 1000x3000", png.width === 1000 && png.height === 3000,
+    let m = await containerMetrics(driver);
+    let expW = m.vw - m.cw + m.sw;
+    let expH = m.vh - m.ch + m.sh;
+    check(`inner size = ${expW}x${expH} (chrome + expanded container)`,
+      png.width === Math.round(expW) && png.height === Math.round(expH),
       `got ${png.width}x${png.height}`);
-    check("inner sticky painted once (top)", near(px(png, 75, 60), [255, 0, 0]), `got ${px(png, 75, 60)}`);
-    check("inner sticky not repeated below fold", !near(px(png, 75, 1500), [255, 0, 0]), `got ${px(png, 75, 1500)}`);
-    checkGrid(png, "inner", 500, 200);   // border offset: a 10px shift would break these
-    checkGrid(png, "inner", 500, 1400);
-    checkGrid(png, "inner", 500, 2900);
-    checkGrid(png, "inner", 900, 2000);  // right of clientWidth: exercises horizontal stitch
+    check("inner chrome marker painted once", near(px(png, 10, 10), [255, 0, 255]), `got ${px(png, 10, 10)}`);
+    check("inner blank continuation = body bg",
+      near(px(png, 10, m.top + m.ch + 300), [0, 128, 0]), `got ${px(png, 10, m.top + m.ch + 300)}`);
+    check("inner sticky painted once (top)",
+      near(px(png, m.left + 75, m.top + 60), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 60)}`);
+    check("inner sticky not repeated below fold",
+      !near(px(png, m.left + 75, m.top + 1500), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 1500)}`);
+    checkGrid(png, "inner", 500, 200, m.left, m.top);   // border offset: a 10px shift breaks these
+    checkGrid(png, "inner", 500, 1400, m.left, m.top);
+    checkGrid(png, "inner", 500, 2900, m.left, m.top);
+    checkGrid(png, "inner", 900, 2000, m.left, m.top);  // right of clientWidth: horizontal stitch
     const restored2 = await driver.executeScript(
       'return { sticky: getComputedStyle(document.getElementById("innersticky")).position }');
     check("inner: sticky restored", restored2.sticky === "sticky", JSON.stringify(restored2));
@@ -120,14 +142,22 @@ async function capture(driver, url) {
     // --- fixture 3: SPA that replaces the sticky node on every scroll ---
     console.log("fixture: rerender.html (sticky node recreated on scroll, stitch path)");
     png = await capture(driver, `http://127.0.0.1:${PORT}/rerender.html`);
-    check("rerender size = 1100x3000", png.width === 1100 && png.height === 3000,
+    m = await containerMetrics(driver);
+    expW = m.vw - m.cw + m.sw;
+    expH = m.vh - m.ch + m.sh;
+    check(`rerender size = ${expW}x${expH}`,
+      png.width === Math.round(expW) && png.height === Math.round(expH),
       `got ${png.width}x${png.height}`);
-    check("rerender sticky painted once (top)", near(px(png, 75, 60), [255, 0, 0]), `got ${px(png, 75, 60)}`);
-    check("rerender sticky not repeated (row 1)", !near(px(png, 75, 660), [255, 0, 0]), `got ${px(png, 75, 660)}`);
-    check("rerender sticky not repeated (row 2)", !near(px(png, 75, 1260), [255, 0, 0]), `got ${px(png, 75, 1260)}`);
-    check("rerender sticky not repeated (deep)", !near(px(png, 75, 2460), [255, 0, 0]), `got ${px(png, 75, 2460)}`);
-    checkGrid(png, "rerender", 550, 1500);
-    checkGrid(png, "rerender", 1050, 2900);
+    check("rerender sticky painted once (top)",
+      near(px(png, m.left + 75, m.top + 60), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 60)}`);
+    check("rerender sticky not repeated (row 1)",
+      !near(px(png, m.left + 75, m.top + 660), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 660)}`);
+    check("rerender sticky not repeated (row 2)",
+      !near(px(png, m.left + 75, m.top + 1260), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 1260)}`);
+    check("rerender sticky not repeated (deep)",
+      !near(px(png, m.left + 75, m.top + 2460), [255, 0, 0]), `got ${px(png, m.left + 75, m.top + 2460)}`);
+    checkGrid(png, "rerender", 550, 1500, m.left, m.top);
+    checkGrid(png, "rerender", 1050, 2900, m.left, m.top);
 
     console.log(failures.length === 0
       ? "\nALL E2E CHECKS PASSED"

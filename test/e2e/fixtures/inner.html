@@ -5,6 +5,12 @@
 <title>e2e: inner scroll container</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: rgb(0, 128, 0); }
+  /* chrome outside the container: must appear exactly once in the output */
+  #marker {
+    position: absolute; top: 0; left: 0;
+    width: 24px; height: 24px; background: rgb(255, 0, 255);
+  }
   /* Hashed-style class names on purpose: detection must not rely on
      semantic names, and sticky handling must not rely on selectors. */
   .xk9 {
@@ -21,6 +27,7 @@
 </style>
 </head>
 <body>
+<div id="marker"></div>
 <div class="xk9" id="container">
   <div class="q2w">
     <canvas id="grid" width="1000" height="3000"></canvas>

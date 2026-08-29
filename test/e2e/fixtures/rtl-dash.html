@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8">
+<title>e2e: RTL dashboard (visual)</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
+  .app { display: flex; height: 100vh; }
+  .sidebar {
+    width: 220px; background: #0b3d2e; color: #fff; flex-shrink: 0;
+    padding: 16px; box-sizing: border-box;
+  }
+  .sidebar a { display: block; color: #cfe8dd; padding: 10px 6px; text-decoration: none; }
+  .maincol { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .header {
+    height: 56px; background: #fff; border-bottom: 1px solid #ddd;
+    display: flex; align-items: center; padding: 0 20px; flex-shrink: 0;
+  }
+  .scroller { flex: 1; overflow: auto; background: #f4f6f5; }
+  .content { padding: 24px; }
+  .card {
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .card h3 { margin-top: 0; }
+  input { width: 60%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+  .btn { background: #0b3d2e; color: #fff; padding: 10px 24px; border: 0; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar">
+    <h2>توثيق</h2>
+    <a href="#">الرئيسية</a>
+    <a href="#">المواقع</a>
+    <a href="#">المستندات</a>
+    <a href="#">كوكي بانر</a>
+    <a href="#">السجلات</a>
+    <a href="#">الحساب</a>
+  </nav>
+  <div class="maincol">
+    <div class="header"><strong>لوحة التحكم</strong></div>
+    <div class="scroller" id="container">
+      <div class="content" id="cards"></div>
+    </div>
+  </div>
+</div>
+<script>
+  const cards = document.getElementById("cards");
+  for (let i = 1; i <= 12; i++) {
+    const d = document.createElement("div");
+    d.className = "card";
+    d.innerHTML = `<h3>قسم رقم ${i}</h3>
+      <p>محتوى تجريبي للبطاقة ${i} — نص عربي للتأكد من اتجاه الصفحة.</p>
+      <label>حقل الإدخال</label><br><input value="قيمة ${i}"><br><br>
+      <button class="btn">حفظ</button>`;
+    cards.appendChild(d);
+  }
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>
