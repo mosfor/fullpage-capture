@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>e2e: page grows during capture</title>
+<style>
+  html, body { margin: 0; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script>
+  // Infinite-scroll style page with deterministic, finite growth:
+  // starts at one 2400px segment and appends another whenever the viewport
+  // nears the bottom, up to 3 segments (7200px total). Each segment is
+  // painted with the position-encoded grid (r = cellX + 1, g = cellY + 1,
+  // b = 64, in absolute page coordinates) so run.js checkGrid works
+  // anywhere in the grown area.
+  const SEG_H = 2400;
+  const MAX_SEGMENTS = 3;
+  let segments = 0;
+
+  function addSegment() {
+    const offsetY = segments * SEG_H;
+    segments++;
+    const c = document.createElement("canvas");
+    c.width = 1200;
+    c.height = SEG_H;
+    const ctx = c.getContext("2d");
+    for (let cy = 0; cy * 16 < SEG_H; cy++) {
+      for (let cx = 0; cx * 16 < c.width; cx++) {
+        const absCy = cy + offsetY / 16;
+        ctx.fillStyle = `rgb(${(cx + 1) & 255}, ${(absCy + 1) & 255}, 64)`;
+        ctx.fillRect(cx * 16, cy * 16, 16, 16);
+      }
+    }
+    document.body.appendChild(c);
+  }
+
+  addSegment(); // initial: 2400px
+
+  window.addEventListener("scroll", () => {
+    if (segments < MAX_SEGMENTS &&
+        window.scrollY + window.innerHeight > document.body.scrollHeight - 800) {
+      addSegment();
+    }
+  }, { passive: true });
+
+  document.title += " [grid-ready]";
+</script>
+</body>
+</html>

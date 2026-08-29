@@ -13,11 +13,15 @@
   };
 
   // Scroll through the page once so lazy-loaded images/content below the
-  // fold actually render before a direct (no-scroll) capture.
-  async function triggerLazyLoad(dims) {
+  // fold actually render before a direct (no-scroll) capture. `fromY` lets
+  // a repeat pass sweep only the area that appeared since the last pass.
+  async function triggerLazyLoad(dims, fromY = 0) {
     const { fullHeight, viewportHeight } = dims;
     const step = Math.max(viewportHeight, fullHeight / 40);
-    for (let y = step; y < fullHeight; y += step) {
+    // Start AT fromY (not fromY + step): the viewport must cover the start of
+    // a newly appended region too, and when growth is shorter than one step
+    // the loop would otherwise not scroll at all.
+    for (let y = fromY; y < fullHeight; y += step) {
       fpc.scroll(0, Math.min(y, fullHeight - viewportHeight));
       await fpc.nextPaint();
       await fpc.sleep(40);
@@ -50,20 +54,41 @@
   // are no stitching seams. Only valid when the page itself is the scroller —
   // content inside an inner scroll container is clipped in layout.
   fpc.captureFullPageDirect = async function captureFullPageDirect(dims) {
-    const { fullWidth, fullHeight } = dims;
     const dpr = window.devicePixelRatio || 1;
     const MAX_DIM = 32767;
     const MAX_CANVAS_PIXELS = 100e6;
-    const scale = Math.min(
-      dpr,
-      MAX_DIM / fullWidth,
-      MAX_DIM / fullHeight,
-      Math.sqrt(MAX_CANVAS_PIXELS / (fullWidth * fullHeight)),
-    );
 
     fpc.disableScrollEffects();
     try {
       await triggerLazyLoad(dims);
+
+      // Infinite-scroll style pages append content during the pre-pass above,
+      // so the caller's measurement goes stale and the capture rect would cut
+      // the new content off. Re-measure and sweep only the newly appeared
+      // area, at most MAX_GROW_PASSES extra times so a truly endless feed
+      // still terminates. The final height is additionally hard-capped at
+      // GROW_CAP x the initial measurement (MAX_DIM / MAX_CANVAS_PIXELS keep
+      // bounding the output size via `scale` below).
+      const MAX_GROW_PASSES = 2;
+      const GROW_CAP = 4;
+      let sweptHeight = dims.fullHeight;
+      for (let pass = 0; pass < MAX_GROW_PASSES; pass++) {
+        const fresh = fpc.getPageDimensions();
+        if (fresh.fullHeight <= sweptHeight + 1) break;
+        await triggerLazyLoad(fresh, sweptHeight);
+        sweptHeight = fresh.fullHeight;
+      }
+      const grown = fpc.getPageDimensions();
+      const fullWidth = grown.fullWidth;
+      const fullHeight = Math.min(grown.fullHeight, dims.fullHeight * GROW_CAP);
+
+      const scale = Math.min(
+        dpr,
+        MAX_DIM / fullWidth,
+        MAX_DIM / fullHeight,
+        Math.sqrt(MAX_CANVAS_PIXELS / (fullWidth * fullHeight)),
+      );
+
       fpc.scroll(0, 0);
       await fpc.awaitScroll(0, 0);
       await fpc.waitForCaptureReady();
