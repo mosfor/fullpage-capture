@@ -9,53 +9,14 @@
 //   GECKODRIVER_BIN path to geckodriver      (default: geckodriver on PATH)
 
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const http = require("http");
-const { execFileSync } = require("child_process");
 
-const { Builder } = require("selenium-webdriver");
-const firefox = require("selenium-webdriver/firefox");
 const { PNG } = require("pngjs");
+const { makeDriver, hookMessage } = require("./common");
 
-const REPO = path.resolve(__dirname, "..", "..");
 const FIXTURES = path.join(__dirname, "fixtures");
 const PORT = 8899;
-
-// ---------- build test extension ----------
-
-function buildTestXpi() {
-  const dist = fs.mkdtempSync(path.join(os.tmpdir(), "fpc-dist-"));
-  for (const dir of ["content", "background", "popup", "icons"]) {
-    fs.cpSync(path.join(REPO, dir), path.join(dist, dir), { recursive: true });
-  }
-  fs.copyFileSync(path.join(__dirname, "test-hook.js"), path.join(dist, "test-hook.js"));
-
-  const manifest = JSON.parse(fs.readFileSync(path.join(REPO, "manifest.json"), "utf8"));
-  // Test builds auto-inject on every page so the harness can trigger captures
-  // without driving browser UI. Production injects on demand instead.
-  manifest.content_scripts = [
-    {
-      matches: ["<all_urls>"],
-      js: [
-        "content/utils.js",
-        "content/scroll.js",
-        "content/fixed-elements.js",
-        "content/selection.js",
-        "content/capture.js",
-        "content/content.js",
-        "test-hook.js",
-      ],
-      run_at: "document_idle",
-    },
-  ];
-  fs.writeFileSync(path.join(dist, "manifest.json"), JSON.stringify(manifest, null, 2));
-
-  const xpi = path.join(dist, "..", path.basename(dist) + ".xpi");
-  execFileSync("python3", ["-m", "zipfile", "-c", xpi,
-    "manifest.json", "test-hook.js", "content", "background", "popup", "icons"], { cwd: dist });
-  return xpi;
-}
 
 // ---------- fixture server ----------
 
@@ -112,41 +73,17 @@ async function capture(driver, url) {
   await driver.wait(async () => (await driver.getTitle()).includes("[grid-ready]"), 10000);
   // let the content scripts settle
   await driver.sleep(500);
-  await driver.executeScript('window.postMessage({type:"FPC_TEST_CAPTURE"}, "*")');
-  await driver.wait(async () => {
-    const st = await driver.executeScript(
-      'const el = document.getElementById("fpc-test-result"); return el ? el.dataset.status : null');
-    if (st === "error") {
-      const msg = await driver.executeScript('return document.getElementById("fpc-test-result").value');
-      throw new Error("capture failed in extension: " + msg);
-    }
-    return st === "ok";
-  }, 120000, "capture did not complete");
-  const dataUrl = await driver.executeScript('return document.getElementById("fpc-test-result").value');
+  const dataUrl = await hookMessage(driver, "FPC_TEST_CAPTURE");
   return PNG.sync.read(Buffer.from(dataUrl.split(",")[1], "base64"));
 }
 
 // ---------- main ----------
 
 (async () => {
-  process.env.MOZ_DISABLE_CONTENT_SANDBOX = "1";
-  process.env.MOZ_DISABLE_RDD_SANDBOX = "1";
-  process.env.MOZ_DISABLE_GMP_SANDBOX = "1";
-
-  const xpi = buildTestXpi();
   const server = await serveFixtures();
-
-  const options = new firefox.Options().addArguments("-headless", "-width=1280", "-height=900");
-  if (process.env.FIREFOX_BIN) options.setBinary(process.env.FIREFOX_BIN);
-  const builder = new Builder().forBrowser("firefox").setFirefoxOptions(options);
-  if (process.env.GECKODRIVER_BIN) {
-    builder.setFirefoxService(new firefox.ServiceBuilder(process.env.GECKODRIVER_BIN));
-  }
-  const driver = await builder.build();
+  const driver = await makeDriver();
 
   try {
-    await driver.installAddon(xpi, true);
-
     // --- fixture 1: document scroller -> direct captureTab path ---
     console.log("fixture: direct.html (document scroller, direct render path)");
     let png = await capture(driver, `http://127.0.0.1:${PORT}/direct.html`);
@@ -179,6 +116,18 @@ async function capture(driver, url) {
     const restored2 = await driver.executeScript(
       'return { sticky: getComputedStyle(document.getElementById("innersticky")).position }');
     check("inner: sticky restored", restored2.sticky === "sticky", JSON.stringify(restored2));
+
+    // --- fixture 3: SPA that replaces the sticky node on every scroll ---
+    console.log("fixture: rerender.html (sticky node recreated on scroll, stitch path)");
+    png = await capture(driver, `http://127.0.0.1:${PORT}/rerender.html`);
+    check("rerender size = 1100x3000", png.width === 1100 && png.height === 3000,
+      `got ${png.width}x${png.height}`);
+    check("rerender sticky painted once (top)", near(px(png, 75, 60), [255, 0, 0]), `got ${px(png, 75, 60)}`);
+    check("rerender sticky not repeated (row 1)", !near(px(png, 75, 660), [255, 0, 0]), `got ${px(png, 75, 660)}`);
+    check("rerender sticky not repeated (row 2)", !near(px(png, 75, 1260), [255, 0, 0]), `got ${px(png, 75, 1260)}`);
+    check("rerender sticky not repeated (deep)", !near(px(png, 75, 2460), [255, 0, 0]), `got ${px(png, 75, 2460)}`);
+    checkGrid(png, "rerender", 550, 1500);
+    checkGrid(png, "rerender", 1050, 2900);
 
     console.log(failures.length === 0
       ? "\nALL E2E CHECKS PASSED"

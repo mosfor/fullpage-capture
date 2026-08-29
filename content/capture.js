@@ -93,9 +93,6 @@
     fpc.scroll(0, 0);
     await fpc.awaitScroll(0, 0);
 
-    const fixedElements = fpc.findFixedElements();
-    console.debug("[FullPage Capture] fixed/sticky elements to neutralize:", fixedElements);
-
     const cols = Math.ceil(fullWidth / viewportWidth);
     const rows = Math.ceil(fullHeight / viewportHeight);
     const canvas = document.createElement("canvas");
@@ -103,15 +100,8 @@
     canvas.height = Math.round(fullHeight * scale);
     const ctx = canvas.getContext("2d");
 
-    let fixedHidden = false;
-
     try {
       for (let row = 0; row < rows; row++) {
-        if (row === 1 && fixedElements.length > 0 && !fixedHidden) {
-          fpc.hideFixed(fixedElements);
-          fixedHidden = true;
-        }
-
         for (let col = 0; col < cols; col++) {
           const idealX = col * viewportWidth;
           const idealY = row * viewportHeight;
@@ -120,6 +110,16 @@
 
           fpc.scroll(clampedX, clampedY);
           await fpc.awaitScroll(clampedX, clampedY);
+          // Re-detect on every tile after the first row: SPAs re-render on
+          // scroll and can replace nodes, resurrecting sticky/fixed elements
+          // that were already neutralized. hideFixed is idempotent per node.
+          if (row > 0) {
+            const found = fpc.findFixedElements();
+            if (row === 1 && col === 0) {
+              console.debug("[FullPage Capture] neutralizing fixed/sticky elements:", found);
+            }
+            fpc.hideFixed(found);
+          }
           await fpc.waitForCaptureReady();
 
           const res = await browser.runtime.sendMessage({
@@ -153,7 +153,7 @@
         }
       }
     } finally {
-      if (fixedHidden) fpc.restoreFixed();
+      fpc.restoreFixed();
       fpc.restoreScrollEffects();
       fpc.scroll(origX, origY);
     }
@@ -218,8 +218,6 @@
     canvas.height = Math.round(selH * dpr);
     const ctx = canvas.getContext("2d");
 
-    const fixedElements = fpc.findFixedElements();
-
     fpc.disableScrollEffects();
     fpc.scroll(0, 0);
     await fpc.awaitScroll(0, 0);
@@ -228,15 +226,9 @@
     const endCol = Math.ceil((selX + selW) / viewportWidth);
     const startRow = Math.floor(selY / viewportHeight);
     const endRow = Math.ceil((selY + selH) / viewportHeight);
-    let fixedHidden = false;
 
     try {
       for (let row = startRow; row < endRow; row++) {
-        if (row > startRow && fixedElements.length > 0 && !fixedHidden) {
-          fpc.hideFixed(fixedElements);
-          fixedHidden = true;
-        }
-
         for (let col = startCol; col < endCol; col++) {
           const idealX = col * viewportWidth;
           const idealY = row * viewportHeight;
@@ -245,6 +237,8 @@
 
           fpc.scroll(clampedX, clampedY);
           await fpc.awaitScroll(clampedX, clampedY);
+          // Re-detect per tile — see captureFullPage for rationale.
+          if (row > startRow) fpc.hideFixed(fpc.findFixedElements());
           await fpc.waitForCaptureReady();
 
           const res = await browser.runtime.sendMessage({
@@ -290,7 +284,7 @@
         }
       }
     } finally {
-      if (fixedHidden) fpc.restoreFixed();
+      fpc.restoreFixed();
       fpc.restoreScrollEffects();
       fpc.scroll(origX, origY);
     }
