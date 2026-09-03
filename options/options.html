@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <h1>FullPage Capture</h1>
+
+  <div class="setting">
+    <label for="format">Image format</label>
+    <select id="format">
+      <option value="png">PNG</option>
+      <option value="jpeg">JPEG</option>
+      <option value="webp">WebP</option>
+    </select>
+    <p class="hint">Format applies to file output. Clipboard is always PNG.</p>
+  </div>
+
+  <div class="setting" id="qualityRow">
+    <label for="quality">Quality <span class="value" id="qualityValue">90</span></label>
+    <input type="range" id="quality" min="1" max="100" step="1" value="90">
+    <p class="hint">Only used for JPEG and WebP.</p>
+  </div>
+
+  <script src="../content/settings.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

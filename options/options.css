@@ -1,0 +1,62 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  max-width: 420px;
+  padding: 16px;
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: 13px;
+  background: #fff;
+  color: #1a1a1a;
+}
+h1 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 14px;
+}
+.setting {
+  margin-bottom: 16px;
+}
+.setting label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+.setting label .value {
+  color: #4A90D9;
+  font-weight: 700;
+}
+.setting select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1a1a1a;
+  border: 1.5px solid #e8eaed;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+.setting select:hover {
+  border-color: #4A90D9;
+  background: #f7faff;
+}
+.setting input[type="range"] {
+  width: 100%;
+  accent-color: #4A90D9;
+  cursor: pointer;
+}
+.setting .hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #999;
+}
+.setting.disabled label,
+.setting.disabled .hint {
+  opacity: 0.5;
+}
+.setting.disabled input[type="range"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

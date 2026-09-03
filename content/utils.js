@@ -91,24 +91,62 @@
     }, 1500);
   };
 
+  fpc.convertImage = async function convertImage(blob, format, quality) {
+    if (format !== "jpeg" && format !== "webp") return blob;
+
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = await fpc.loadImage(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (format === "jpeg") {
+        // JPEG has no alpha; transparent areas would encode as black
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      ctx.drawImage(img, 0, 0);
+      return await new Promise((resolve, reject) => {
+        canvas.toBlob((out) => {
+          if (out) resolve(out);
+          else reject(new Error("Failed to encode screenshot"));
+        }, "image/" + format, quality / 100);
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
   fpc.outputResult = async function outputResult(image, output) {
     const blob = image instanceof Blob
       ? image
       : await fetch(image).then((res) => res.blob());
 
     if (output === "file") {
+      const settings = await fpc.getSettings();
+      const converted = await fpc.convertImage(
+        blob,
+        settings.format,
+        settings.quality
+      );
+      const ext = settings.format === "jpeg" ? "jpg" : settings.format;
+      const dataUrl = converted === blob && !(image instanceof Blob)
+        ? image
+        : await fpc.blobToDataUrl(converted);
       const timestamp = new Date()
         .toISOString()
         .replace(/[:.]/g, "-")
         .slice(0, 19);
       const dlResult = await browser.runtime.sendMessage({
         action: "download",
-        dataUrl: image instanceof Blob ? await fpc.blobToDataUrl(blob) : image,
-        filename: `capture-${timestamp}.png`,
+        dataUrl,
+        filename: `capture-${timestamp}.${ext}`,
       });
       if (!dlResult.success)
         throw new Error(dlResult.error || "Download failed");
     } else {
+      // Firefox ClipboardItem only accepts image/png
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": blob }),
       ]);

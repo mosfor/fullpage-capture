@@ -10,7 +10,8 @@ Minimal Firefox/Zen browser extension that captures screenshots and copies them 
 - **Scrolling selection** — select a region then auto-scroll to capture content taller than the viewport with adjustable bounds
 - **Scroll container detection** — works on pages with inner scrollable areas (dashboards, SPAs)
 - **Sticky/fixed element handling** — fixed elements are hidden and sticky ones (sidebars, TOCs) un-stuck after the first frame, so nothing repeats in the stitched image
-- **Clipboard or file** — output to clipboard or save as PNG file
+- **Clipboard or file** — output to clipboard or save as file
+- **PNG, JPEG, or WebP** — pick file format and quality on the options page (clipboard is always PNG)
 - **Keyboard shortcuts** — all configurable via `about:addons`
 - **Performance optimized** — reduced jank on large pages
 

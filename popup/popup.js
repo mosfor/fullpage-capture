@@ -15,6 +15,7 @@ const status = document.getElementById("status");
 let outputMode = "clipboard";
 
 const CONTENT_SCRIPTS = [
+  "/content/settings.js",
   "/content/utils.js",
   "/content/scroll.js",
   "/content/fixed-elements.js",

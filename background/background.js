@@ -2,6 +2,7 @@
 // Handles privileged APIs: captureVisibleTab, keyboard commands, downloads
 
 const CONTENT_SCRIPTS = [
+  "/content/settings.js",
   "/content/utils.js",
   "/content/scroll.js",
   "/content/fixed-elements.js",
