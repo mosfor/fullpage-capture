@@ -91,6 +91,68 @@
     }, 1500);
   };
 
+  // Capture delay: shows an on-page countdown for `captureDelay` seconds so
+  // the user can set up hover states or open dropdowns before the shot.
+  // Escape cancels (throws "cancelled", handled silently upstream). The
+  // countdown element is removed and a paint awaited BEFORE resolving so it
+  // can never appear in the capture; its class deliberately avoids "fixed"/
+  // "sticky" substrings so the fixed-element hider never targets it either.
+  fpc.delayBeforeCapture = async function delayBeforeCapture() {
+    const settings = await fpc.getSettings();
+    const seconds = Math.max(0, parseInt(settings.captureDelay, 10) || 0);
+    if (seconds === 0) return;
+
+    const el = document.createElement("div");
+    el.className = "_fullpage-capture-countdown";
+    el.setAttribute("style", [
+      "position:fixed!important",
+      "top:20px!important",
+      "right:20px!important",
+      "z-index:2147483647!important",
+      "min-width:48px!important",
+      "padding:8px 12px!important",
+      "border-radius:8px!important",
+      "background:rgba(0,0,0,0.75)!important",
+      "color:#fff!important",
+      "font:700 20px system-ui, sans-serif!important",
+      "text-align:center!important",
+      "pointer-events:none!important",
+      "box-shadow:0 4px 16px rgba(0,0,0,.2)!important",
+      "margin:0!important",
+      "box-sizing:border-box!important",
+      "line-height:1.2!important",
+    ].join(";"));
+    document.body.appendChild(el);
+
+    let cancel;
+    const cancelPromise = new Promise((resolve) => {
+      cancel = () => resolve(true);
+    });
+    const onKey = (e) => {
+      if (e.key === "Escape") cancel();
+    };
+    document.addEventListener("keydown", onKey, true);
+
+    let cancelled = false;
+    try {
+      for (let remaining = seconds; remaining > 0 && !cancelled; remaining--) {
+        el.textContent = remaining + "…";
+        cancelled = await Promise.race([
+          fpc.sleep(1000).then(() => false),
+          cancelPromise,
+        ]);
+      }
+    } finally {
+      document.removeEventListener("keydown", onKey, true);
+      // Must not appear in the shot: remove, then wait two rAFs for the
+      // removal to actually paint before any capture fires.
+      el.remove();
+      await fpc.nextPaint();
+    }
+
+    if (cancelled) throw new Error("cancelled");
+  };
+
   fpc.convertImage = async function convertImage(blob, format, quality) {
     if (format !== "jpeg" && format !== "webp") return blob;
 

@@ -285,6 +285,10 @@
     const rect = await fpc.selectRegion();
     if (!rect) throw new Error("cancelled");
 
+    // Optional capture delay AFTER the selection is drawn, so the user can
+    // set up hover states / open dropdowns inside the chosen region.
+    await fpc.delayBeforeCapture();
+
     await fpc.sleep(50);
 
     const res = await browser.runtime.sendMessage({
@@ -319,6 +323,9 @@
   fpc.captureScrollRegion = async function captureScrollRegion(windowId) {
     const rect = await fpc.selectScrollRegion();
     if (!rect) throw new Error("cancelled");
+
+    // Same as captureRegion: delay after selection, before any scrolling.
+    await fpc.delayBeforeCapture();
 
     const dpr = window.devicePixelRatio || 1;
     const dims = fpc.getPageDimensions();

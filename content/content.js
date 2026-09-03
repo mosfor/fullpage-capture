@@ -38,11 +38,15 @@
     try {
       let dataUrl;
 
+      // Capture delay runs up front for fullPage/viewport; region modes
+      // delay after the selection is drawn instead (see capture.js).
       switch (mode) {
         case "fullPage":
+          await fpc.delayBeforeCapture();
           dataUrl = await fpc.captureFullPage(windowId);
           break;
         case "viewport":
+          await fpc.delayBeforeCapture();
           dataUrl = await fpc.captureViewport(windowId);
           break;
         case "region":

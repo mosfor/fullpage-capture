@@ -10,6 +10,7 @@
     quality: 90,
     filenameTemplate: "capture-{date}-{time}",
     saveAs: true,
+    captureDelay: 0,
   };
 
   fpc.getSettings = async function getSettings() {

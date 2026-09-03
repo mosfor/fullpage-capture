@@ -7,6 +7,7 @@ const qualityRow = document.getElementById("qualityRow");
 const templateInput = document.getElementById("filenameTemplate");
 const filenamePreview = document.getElementById("filenamePreview");
 const saveAsCheckbox = document.getElementById("saveAs");
+const delaySelect = document.getElementById("captureDelay");
 
 const fpc = window.FullPageCapture;
 
@@ -15,6 +16,7 @@ fpc.getSettings().then((settings) => {
   qualitySlider.value = settings.quality;
   templateInput.value = settings.filenameTemplate;
   saveAsCheckbox.checked = settings.saveAs;
+  delaySelect.value = String(settings.captureDelay);
   updateQualityUI();
   updatePreview();
 });
@@ -57,4 +59,8 @@ templateInput.addEventListener("input", () => {
 
 saveAsCheckbox.addEventListener("change", () => {
   browser.storage.local.set({ saveAs: saveAsCheckbox.checked });
+});
+
+delaySelect.addEventListener("change", () => {
+  browser.storage.local.set({ captureDelay: parseInt(delaySelect.value, 10) });
 });
