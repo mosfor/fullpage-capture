@@ -85,7 +85,11 @@ async function triggerCapture(mode) {
     });
 
     if (result && result.success) {
-      const msg = outputMode === "file" ? "Saved to file" : "Copied to clipboard";
+      const msg = outputMode === "file"
+        ? "Saved to file"
+        : outputMode === "edit"
+          ? "Opening editor"
+          : "Copied to clipboard";
       showOverlay("success", msg);
     } else {
       throw new Error(result?.error || "Capture failed");

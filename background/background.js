@@ -38,6 +38,29 @@ browser.runtime.onMessage.addListener((request, sender) => {
       .catch((error) => ({ success: false, error: error.message }));
   }
 
+  // Stash the capture in storage.local (survives event page unload) and
+  // open the annotation editor, which reads and removes it. The source
+  // tab's title/domain ride along for {title}/{domain} filename tokens.
+  if (request.action === "openEditor") {
+    const tab = sender.tab;
+    let domain = "";
+    try {
+      domain = new URL(tab && tab.url).hostname;
+    } catch (e) { /* about:blank etc. — leave empty */ }
+    return browser.storage.local.set({
+      pendingEdit: {
+        dataUrl: request.dataUrl,
+        title: (tab && tab.title) || "",
+        domain,
+      },
+    })
+      .then(() => browser.tabs.create({
+        url: browser.runtime.getURL("editor/editor.html"),
+      }))
+      .then(() => ({ success: true }))
+      .catch((error) => ({ success: false, error: error.message }));
+  }
+
   if (request.action === "download") {
     // Convert data URL to blob URL (data URLs can exceed size limits)
     return fetch(request.dataUrl)

@@ -214,7 +214,17 @@
       ? image
       : await fetch(image).then((res) => res.blob());
 
-    if (output === "file") {
+    if (output === "edit") {
+      const dataUrl = image instanceof Blob
+        ? await fpc.blobToDataUrl(image)
+        : image;
+      const result = await browser.runtime.sendMessage({
+        action: "openEditor",
+        dataUrl,
+      });
+      if (!result || !result.success)
+        throw new Error((result && result.error) || "Failed to open editor");
+    } else if (output === "file") {
       const settings = await fpc.getSettings();
       let ext, dataUrl;
       if (settings.format === "pdf") {
