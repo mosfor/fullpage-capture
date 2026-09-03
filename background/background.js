@@ -64,6 +64,7 @@ browser.commands.onCommand.addListener(async (command) => {
     "capture-viewport": "viewport",
     "capture-region": "region",
     "capture-scroll-region": "scrollRegion",
+    "capture-element": "element",
   };
 
   const mode = modeMap[command];

@@ -4,6 +4,7 @@ const fullPageBtn = document.getElementById("fullPageBtn");
 const viewportBtn = document.getElementById("viewportBtn");
 const regionBtn = document.getElementById("regionBtn");
 const scrollRegionBtn = document.getElementById("scrollRegionBtn");
+const elementBtn = document.getElementById("elementBtn");
 const outputToggle = document.getElementById("outputToggle");
 const grid = document.getElementById("grid");
 const overlay = document.getElementById("overlay");
@@ -50,11 +51,16 @@ fullPageBtn.addEventListener("click", () => triggerCapture("fullPage"));
 viewportBtn.addEventListener("click", () => triggerCapture("viewport"));
 regionBtn.addEventListener("click", () => triggerCapture("region"));
 scrollRegionBtn.addEventListener("click", () => triggerCapture("scrollRegion"));
+elementBtn.addEventListener("click", () => triggerCapture("element"));
 
 async function triggerCapture(mode) {
   try {
     disableAll();
-    status.textContent = mode === "region" ? "Select a region..." : "Capturing...";
+    status.textContent = mode === "region"
+      ? "Select a region..."
+      : mode === "element"
+        ? "Select an element..."
+        : "Capturing...";
 
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (!tab) throw new Error("No active tab");
@@ -115,6 +121,7 @@ function disableAll() {
   viewportBtn.disabled = true;
   regionBtn.disabled = true;
   scrollRegionBtn.disabled = true;
+  elementBtn.disabled = true;
 }
 
 function enableAll() {
@@ -122,4 +129,5 @@ function enableAll() {
   viewportBtn.disabled = false;
   regionBtn.disabled = false;
   scrollRegionBtn.disabled = false;
+  elementBtn.disabled = false;
 }

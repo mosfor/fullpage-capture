@@ -320,6 +320,52 @@
     return fpc.canvasToPngBlob(canvas);
   };
 
+  fpc.captureElement = async function captureElement(windowId) {
+    const rect = await fpc.selectElement();
+    if (!rect) throw new Error("cancelled");
+
+    // Same as captureRegion: optional delay AFTER the element is picked, so
+    // the user can set up hover states / open dropdowns inside it.
+    await fpc.delayBeforeCapture();
+
+    // Direct render (tabs.captureTab + rect) rasterizes the element straight
+    // from layout without scrolling, so elements taller than the viewport
+    // come out whole. Clamp to the page box — captureTab rejects rects that
+    // poke outside it. Clamp against the document, not getPageDimensions():
+    // the rect is in top-level page coordinates even when an inner scroll
+    // container exists.
+    const html = document.documentElement;
+    const pageW = Math.max(html.scrollWidth, html.clientWidth);
+    const pageH = Math.max(html.scrollHeight, html.clientHeight);
+
+    const x = Math.max(0, Math.min(rect.x, pageW));
+    const y = Math.max(0, Math.min(rect.y, pageH));
+    const width = Math.min(rect.x + rect.width, pageW) - x;
+    const height = Math.min(rect.y + rect.height, pageH) - y;
+
+    if (width < 1 || height < 1) throw new Error("Element has no visible area");
+
+    // Same scale handling as captureFullPageDirect: render at devicePixelRatio,
+    // capped so huge elements can't exceed canvas limits.
+    const dpr = window.devicePixelRatio || 1;
+    const MAX_DIM = 32767;
+    const MAX_CANVAS_PIXELS = 100e6;
+    const scale = Math.min(
+      dpr,
+      MAX_DIM / width,
+      MAX_DIM / height,
+      Math.sqrt(MAX_CANVAS_PIXELS / (width * height)),
+    );
+
+    const res = await browser.runtime.sendMessage({
+      action: "captureTab",
+      rect: { x, y, width, height },
+      scale,
+    });
+    if (!res.success) throw new Error(res.error);
+    return res.dataUrl;
+  };
+
   fpc.captureScrollRegion = async function captureScrollRegion(windowId) {
     const rect = await fpc.selectScrollRegion();
     if (!rect) throw new Error("cancelled");

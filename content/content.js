@@ -55,6 +55,9 @@
         case "scrollRegion":
           dataUrl = await fpc.captureScrollRegion(windowId);
           break;
+        case "element":
+          dataUrl = await fpc.captureElement(windowId);
+          break;
         default:
           throw new Error("Unknown capture mode");
       }

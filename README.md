@@ -8,6 +8,7 @@ Minimal Firefox/Zen browser extension that captures screenshots and copies them 
 - **Visible area capture** — grab exactly what's on screen
 - **Region selection** — draw a rectangle to capture any area
 - **Scrolling selection** — select a region then auto-scroll to capture content taller than the viewport with adjustable bounds
+- **Element capture** — hover to highlight any element (scroll or arrow keys expand to its parent), click to capture exactly that element, even taller than the viewport
 - **Scroll container detection** — works on pages with inner scrollable areas (dashboards, SPAs)
 - **Sticky/fixed element handling** — fixed elements are hidden and sticky ones (sidebars, TOCs) un-stuck after the first frame, so nothing repeats in the stitched image
 - **Clipboard or file** — output to clipboard or save as file
@@ -38,6 +39,7 @@ Minimal Firefox/Zen browser extension that captures screenshots and copies them 
 | Visible area | `Alt+Shift+2` |
 | Select region | `Alt+Shift+3` |
 | Scrolling selection | `Alt+Shift+4` |
+| Element capture | `Alt+Shift+5` |
 
 Customize in `about:addons` → gear icon → "Manage Extension Shortcuts"
 
