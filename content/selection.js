@@ -284,15 +284,24 @@
       function onClick(e) {
         e.preventDefault();
         e.stopPropagation();
+        // Hit-test at the click position too: a click with no prior
+        // mousemove (e.g. right after a keyboard-triggered start) would
+        // otherwise find no hover element and leave the selection hanging.
+        refreshHover(e.clientX, e.clientY);
         const el = resolveTarget();
         if (!el) return;
         const r = el.getBoundingClientRect();
-        // Page coordinates: viewport rect + top-level scroll offsets
+        // Page coordinates: viewport rect + top-level scroll offsets. The
+        // element rides along so the caller can re-measure after a capture
+        // delay (the page may reflow while a dropdown is opened).
         finish({
-          x: r.left + window.scrollX,
-          y: r.top + window.scrollY,
-          width: r.width,
-          height: r.height,
+          el,
+          rect: {
+            x: r.left + window.scrollX,
+            y: r.top + window.scrollY,
+            width: r.width,
+            height: r.height,
+          },
         });
       }
 

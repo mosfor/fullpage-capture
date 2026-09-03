@@ -137,9 +137,16 @@
         cancel();
       }
     };
+    // Switching away mid-countdown cancels: a viewport capture of a hidden
+    // tab would grab whatever tab is visible instead, and rAF (used below
+    // to hide the badge) never fires while hidden, hanging the capture.
+    const onVisibility = () => {
+      if (document.hidden) cancel();
+    };
     document.addEventListener("keydown", onKey, true);
+    document.addEventListener("visibilitychange", onVisibility);
 
-    let cancelled = false;
+    let cancelled = document.hidden;
     try {
       for (let remaining = seconds; remaining > 0 && !cancelled; remaining--) {
         el.textContent = remaining + "…";
@@ -150,10 +157,12 @@
       }
     } finally {
       document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("visibilitychange", onVisibility);
       // Must not appear in the shot: remove, then wait two rAFs for the
-      // removal to actually paint before any capture fires.
+      // removal to actually paint before any capture fires (rAF is paused
+      // in hidden tabs, so skip the wait there — nothing paints anyway).
       el.remove();
-      await fpc.nextPaint();
+      if (!document.hidden) await fpc.nextPaint();
     }
 
     if (cancelled) throw new Error("cancelled");

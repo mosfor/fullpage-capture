@@ -287,13 +287,16 @@
 
     // Optional capture delay AFTER the selection is drawn, so the user can
     // set up hover states / open dropdowns inside the chosen region. The
-    // rect is viewport-relative, so compensate for any scrolling that
-    // happened during the countdown to keep the selected page area.
+    // rect is viewport-relative, so if the user scrolled during the
+    // countdown, restore the original scroll position to bring the
+    // selected content back into view before shooting the viewport.
     const preDelayX = window.scrollX;
     const preDelayY = window.scrollY;
     await fpc.delayBeforeCapture();
-    rect.x -= window.scrollX - preDelayX;
-    rect.y -= window.scrollY - preDelayY;
+    if (window.scrollX !== preDelayX || window.scrollY !== preDelayY) {
+      window.scrollTo(preDelayX, preDelayY);
+      await fpc.nextPaint();
+    }
 
     await fpc.sleep(50);
 
@@ -327,12 +330,26 @@
   };
 
   fpc.captureElement = async function captureElement(windowId) {
-    const rect = await fpc.selectElement();
-    if (!rect) throw new Error("cancelled");
+    const picked = await fpc.selectElement();
+    if (!picked) throw new Error("cancelled");
 
     // Same as captureRegion: optional delay AFTER the element is picked, so
     // the user can set up hover states / open dropdowns inside it.
     await fpc.delayBeforeCapture();
+
+    // The page may have reflowed during the delay (that's what it's for) —
+    // re-measure the element; fall back to the rect from pick time if it
+    // was removed from the DOM.
+    let rect = picked.rect;
+    if (picked.el.isConnected) {
+      const r = picked.el.getBoundingClientRect();
+      rect = {
+        x: r.left + window.scrollX,
+        y: r.top + window.scrollY,
+        width: r.width,
+        height: r.height,
+      };
+    }
 
     // Direct render (tabs.captureTab + rect) rasterizes the element straight
     // from layout without scrolling, so elements taller than the viewport

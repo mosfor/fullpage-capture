@@ -26,9 +26,11 @@ const CONTENT_SCRIPTS = [
   "/content/content.js",
 ];
 
-// Restore saved output preference
+// Restore saved output preference — unless the user already clicked a
+// toggle before this resolved (the click is the fresher choice).
+let outputChosen = false;
 browser.storage.local.get("outputMode").then((data) => {
-  if (data.outputMode) {
+  if (data.outputMode && !outputChosen) {
     outputMode = data.outputMode;
     updateToggle();
   }
@@ -42,6 +44,7 @@ function updateToggle() {
 
 outputToggle.querySelectorAll("button").forEach((btn) => {
   btn.addEventListener("click", () => {
+    outputChosen = true;
     outputMode = btn.dataset.value;
     updateToggle();
     browser.storage.local.set({ outputMode });

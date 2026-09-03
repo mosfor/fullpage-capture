@@ -476,6 +476,9 @@
   async function copyToClipboard() {
     if (!baseImg) return;
     try {
+      // A drawn-but-unconfirmed crop is what the user sees — apply it
+      // rather than exporting the uncropped canvas behind the preview.
+      if (pendingCrop) applyCrop();
       const blob = await fpc.canvasToPngBlob(composeExport());
       // Firefox ClipboardItem only accepts image/png
       await navigator.clipboard.write([
@@ -490,6 +493,8 @@
   async function saveFile() {
     if (!baseImg) return;
     try {
+      // Same as copyToClipboard: export what the crop preview shows
+      if (pendingCrop) applyCrop();
       const blob = await fpc.canvasToPngBlob(composeExport());
       const settings = await fpc.getSettings();
       const encoded = await fpc.encodeForSave(blob, settings);

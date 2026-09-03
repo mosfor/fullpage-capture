@@ -65,6 +65,7 @@ Customize in `about:addons` → gear icon → "Manage Extension Shortcuts"
 | `clipboardWrite` | Copy screenshot to clipboard |
 | `downloads` | Save screenshot as file |
 | `storage` | Remember settings (output, format, filename template) |
+| `unlimitedStorage` | Hand large captures to the annotation editor (the default 10 MB quota is smaller than many full-page shots); granted silently, nothing is stored beyond the handoff |
 
 ## Limitations
 
