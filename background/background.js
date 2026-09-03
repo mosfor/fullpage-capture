@@ -18,6 +18,20 @@ async function injectContentScripts(tabId) {
   }
 }
 
+// Editor handoff entries are consumed by the editor tab, but a tab that
+// closes before decoding (or a decode failure kept for retry) leaves a
+// multi-MB blob behind. Sweep anything old enough that no live editor tab
+// can still be waiting on it.
+const STALE_EDIT_MS = 60 * 60 * 1000;
+async function sweepStaleEdits() {
+  const all = await browser.storage.local.get(null);
+  const stale = Object.keys(all).filter((k) =>
+    k.startsWith("pendingEdit") &&
+    !(all[k] && all[k].created > Date.now() - STALE_EDIT_MS)
+  );
+  if (stale.length) await browser.storage.local.remove(stale);
+}
+
 browser.runtime.onMessage.addListener((request, sender) => {
   if (request.action === "captureVisibleTab") {
     return browser.tabs.captureVisibleTab(request.windowId || null, { format: "png" })
@@ -51,13 +65,15 @@ browser.runtime.onMessage.addListener((request, sender) => {
     } catch (e) { /* about:blank etc. — leave empty */ }
     const key = "pendingEdit-" + Date.now().toString(36) +
       Math.random().toString(36).slice(2, 8);
-    return browser.storage.local.set({
-      [key]: {
-        dataUrl: request.dataUrl,
-        title: (tab && tab.title) || "",
-        domain,
-      },
-    })
+    return sweepStaleEdits()
+      .then(() => browser.storage.local.set({
+        [key]: {
+          dataUrl: request.dataUrl,
+          title: (tab && tab.title) || "",
+          domain,
+          created: Date.now(),
+        },
+      }))
       .then(() => browser.tabs.create({
         url: browser.runtime.getURL("editor/editor.html") +
           "?capture=" + key,

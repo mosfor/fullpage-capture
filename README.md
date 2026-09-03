@@ -65,13 +65,14 @@ Customize in `about:addons` → gear icon → "Manage Extension Shortcuts"
 | `clipboardWrite` | Copy screenshot to clipboard |
 | `downloads` | Save screenshot as file |
 | `storage` | Remember settings (output, format, filename template) |
-| `unlimitedStorage` | Hand large captures to the annotation editor (the default 10 MB quota is smaller than many full-page shots); granted silently, nothing is stored beyond the handoff |
+| `unlimitedStorage` | Hand large captures to the annotation editor (the default 10 MB quota is smaller than many full-page shots); the handoff entry is removed once the editor loads it, and stale entries are swept after an hour |
 
 ## Limitations
 
 - Cannot capture Firefox internal pages (`about:*`, `addons.mozilla.org`)
 - Pages taller than ~32,000px may hit canvas size limits
 - Scroll container mode captures only the scrollable area (sidebars/fixed panels are excluded)
+- Element capture grabs the visible portion of an element inside an inner scroll container — the scrolled-out part can't be rendered in one pass
 
 ## License
 

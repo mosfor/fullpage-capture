@@ -349,6 +349,26 @@
         width: r.width,
         height: r.height,
       };
+
+      // Ancestors with clipping overflow paint only their scrollport:
+      // captureTab renders from layout, so the scrolled-out part of the
+      // element would come out as blank background. Clamp to the portion
+      // that's actually visible inside every clipping ancestor.
+      for (let anc = picked.el.parentElement; anc && anc !== document.documentElement; anc = anc.parentElement) {
+        const style = getComputedStyle(anc);
+        if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+        const ar = anc.getBoundingClientRect();
+        const clipX = ar.left + anc.clientLeft + window.scrollX;
+        const clipY = ar.top + anc.clientTop + window.scrollY;
+        const right = Math.min(rect.x + rect.width, clipX + anc.clientWidth);
+        const bottom = Math.min(rect.y + rect.height, clipY + anc.clientHeight);
+        rect.x = Math.max(rect.x, clipX);
+        rect.y = Math.max(rect.y, clipY);
+        rect.width = right - rect.x;
+        rect.height = bottom - rect.y;
+      }
+      if (rect.width < 1 || rect.height < 1)
+        throw new Error("Element is scrolled out of view");
     }
 
     // Direct render (tabs.captureTab + rect) rasterizes the element straight
