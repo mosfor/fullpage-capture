@@ -8,6 +8,8 @@
     outputMode: "clipboard",
     format: "png",
     quality: 90,
+    filenameTemplate: "capture-{date}-{time}",
+    saveAs: true,
   };
 
   fpc.getSettings = async function getSettings() {

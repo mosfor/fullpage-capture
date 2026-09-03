@@ -118,6 +118,35 @@
     }
   };
 
+  // Expand {title} {domain} {date} {time} {timestamp} in a filename
+  // template and sanitize the result for cross-platform use. `overrides`
+  // lets callers (e.g. the options page preview) substitute sample values.
+  fpc.buildFilename = function buildFilename(template, ext, overrides) {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const values = Object.assign({
+      title: document.title,
+      domain: location.hostname,
+      date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      time: `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`,
+      timestamp: String(Math.floor(now.getTime() / 1000)),
+    }, overrides);
+
+    let name = String(template)
+      // Known tokens expand; unknown tokens keep their text, braces dropped
+      .replace(/\{(\w+)\}/g, (match, key) =>
+        Object.prototype.hasOwnProperty.call(values, key) ? values[key] : key
+      )
+      .replace(/[{}]/g, "")
+      // Characters illegal in filenames on any major OS, plus control chars
+      .replace(/[/\\:*?"<>|\u0000-\u001f\u007f]+/g, "-")
+      .replace(/-{2,}/g, "-")
+      .slice(0, 120)
+      .replace(/^[-. ]+|[-. ]+$/g, "");
+
+    return `${name || "capture"}.${ext}`;
+  };
+
   fpc.outputResult = async function outputResult(image, output) {
     const blob = image instanceof Blob
       ? image
@@ -134,14 +163,11 @@
       const dataUrl = converted === blob && !(image instanceof Blob)
         ? image
         : await fpc.blobToDataUrl(converted);
-      const timestamp = new Date()
-        .toISOString()
-        .replace(/[:.]/g, "-")
-        .slice(0, 19);
       const dlResult = await browser.runtime.sendMessage({
         action: "download",
         dataUrl,
-        filename: `capture-${timestamp}.${ext}`,
+        filename: fpc.buildFilename(settings.filenameTemplate, ext),
+        saveAs: settings.saveAs,
       });
       if (!dlResult.success)
         throw new Error(dlResult.error || "Download failed");

@@ -47,6 +47,42 @@ h1 {
   accent-color: #4A90D9;
   cursor: pointer;
 }
+.setting input[type="text"] {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1a1a1a;
+  border: 1.5px solid #e8eaed;
+  border-radius: 10px;
+  background: #fff;
+}
+.setting input[type="text"]:hover {
+  border-color: #4A90D9;
+  background: #f7faff;
+}
+.setting input[type="text"]:focus {
+  outline: none;
+  border-color: #4A90D9;
+}
+.setting label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+.setting input[type="checkbox"] {
+  accent-color: #4A90D9;
+  cursor: pointer;
+}
+.setting .hint .preview {
+  color: #4A90D9;
+  font-weight: 600;
+  word-break: break-all;
+}
 .setting .hint {
   margin-top: 6px;
   font-size: 11px;

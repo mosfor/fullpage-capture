@@ -23,7 +23,23 @@
     <p class="hint">Only used for JPEG and WebP.</p>
   </div>
 
+  <div class="setting">
+    <label for="filenameTemplate">Filename template</label>
+    <input type="text" id="filenameTemplate" spellcheck="false" autocomplete="off">
+    <p class="hint">Variables: {title}, {domain}, {date}, {time}, {timestamp}</p>
+    <p class="hint">Preview: <span class="preview" id="filenamePreview"></span></p>
+  </div>
+
+  <div class="setting">
+    <label class="checkbox">
+      <input type="checkbox" id="saveAs">
+      Ask where to save each file
+    </label>
+    <p class="hint">When off, files go straight to your downloads folder.</p>
+  </div>
+
   <script src="../content/settings.js"></script>
+  <script src="../content/utils.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

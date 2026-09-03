@@ -46,7 +46,7 @@ browser.runtime.onMessage.addListener((request, sender) => {
         return browser.downloads.download({
           url: blobUrl,
           filename: request.filename,
-          saveAs: true,
+          saveAs: request.saveAs !== false,
         }).then((id) => {
           // Clean up blob URL after download starts
           setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);

@@ -12,6 +12,7 @@ Minimal Firefox/Zen browser extension that captures screenshots and copies them 
 - **Sticky/fixed element handling** — fixed elements are hidden and sticky ones (sidebars, TOCs) un-stuck after the first frame, so nothing repeats in the stitched image
 - **Clipboard or file** — output to clipboard or save as file
 - **PNG, JPEG, or WebP** — pick file format and quality on the options page (clipboard is always PNG)
+- **Filename templates** — name saved files with `{title}`, `{domain}`, `{date}`, `{time}`, `{timestamp}` variables, and choose whether to see a Save As dialog
 - **Keyboard shortcuts** — all configurable via `about:addons`
 - **Performance optimized** — reduced jank on large pages
 
@@ -58,7 +59,7 @@ Customize in `about:addons` → gear icon → "Manage Extension Shortcuts"
 | `<all_urls>` | Inject content script on any page |
 | `clipboardWrite` | Copy screenshot to clipboard |
 | `downloads` | Save screenshot as file |
-| `storage` | Remember output preference |
+| `storage` | Remember settings (output, format, filename template) |
 
 ## Limitations
 
