@@ -39,23 +39,28 @@ browser.runtime.onMessage.addListener((request, sender) => {
   }
 
   // Stash the capture in storage.local (survives event page unload) and
-  // open the annotation editor, which reads and removes it. The source
-  // tab's title/domain ride along for {title}/{domain} filename tokens.
+  // open the annotation editor, which reads and removes it. Each capture
+  // gets its own key, passed via the editor URL, so two quick captures
+  // can't overwrite each other. The source tab's title/domain ride along
+  // for {title}/{domain} filename tokens.
   if (request.action === "openEditor") {
     const tab = sender.tab;
     let domain = "";
     try {
       domain = new URL(tab && tab.url).hostname;
     } catch (e) { /* about:blank etc. — leave empty */ }
+    const key = "pendingEdit-" + Date.now().toString(36) +
+      Math.random().toString(36).slice(2, 8);
     return browser.storage.local.set({
-      pendingEdit: {
+      [key]: {
         dataUrl: request.dataUrl,
         title: (tab && tab.title) || "",
         domain,
       },
     })
       .then(() => browser.tabs.create({
-        url: browser.runtime.getURL("editor/editor.html"),
+        url: browser.runtime.getURL("editor/editor.html") +
+          "?capture=" + key,
       }))
       .then(() => ({ success: true }))
       .catch((error) => ({ success: false, error: error.message }));

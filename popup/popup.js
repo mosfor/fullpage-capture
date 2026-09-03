@@ -84,7 +84,11 @@ async function triggerCapture(mode) {
       windowId: tab.windowId,
     });
 
-    if (result && result.success) {
+    if (result && result.cancelled) {
+      // User pressed Escape (selection or countdown) — nothing was output,
+      // so don't show a false "Saved"/"Copied" confirmation.
+      status.textContent = "";
+    } else if (result && result.success) {
       const msg = outputMode === "file"
         ? "Saved to file"
         : outputMode === "edit"

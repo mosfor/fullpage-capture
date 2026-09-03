@@ -24,7 +24,7 @@ fpc.getSettings().then((settings) => {
 // Preview with sample values (the options page's own title/hostname
 // would be misleading).
 function updatePreview() {
-  const ext = formatSelect.value === "jpeg" ? "jpg" : formatSelect.value;
+  const ext = fpc.extForFormat(formatSelect.value);
   filenamePreview.textContent = fpc.buildFilename(templateInput.value, ext, {
     title: "Example Page",
     domain: "example.com",

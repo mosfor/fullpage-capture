@@ -286,8 +286,14 @@
     if (!rect) throw new Error("cancelled");
 
     // Optional capture delay AFTER the selection is drawn, so the user can
-    // set up hover states / open dropdowns inside the chosen region.
+    // set up hover states / open dropdowns inside the chosen region. The
+    // rect is viewport-relative, so compensate for any scrolling that
+    // happened during the countdown to keep the selected page area.
+    const preDelayX = window.scrollX;
+    const preDelayY = window.scrollY;
     await fpc.delayBeforeCapture();
+    rect.x -= window.scrollX - preDelayX;
+    rect.y -= window.scrollY - preDelayY;
 
     await fpc.sleep(50);
 

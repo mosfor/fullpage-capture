@@ -41,23 +41,30 @@
   let toastTimer = null;
   let textCancelled = false;
 
-  init();
+  init().catch((e) => {
+    emptyMsg.textContent = "Failed to load the capture: " + e.message;
+    emptyMsg.hidden = false;
+  });
 
   async function init() {
-    const data = await browser.storage.local.get("pendingEdit");
-    const pending = data.pendingEdit;
+    // Each capture is handed off under its own key (background puts it in
+    // the URL), so two quick Edit captures can't overwrite each other.
+    const key = new URLSearchParams(location.search).get("capture") || "pendingEdit";
+    const data = await browser.storage.local.get(key);
+    const pending = data[key];
     if (!pending || !pending.dataUrl) {
       emptyMsg.hidden = false;
       return;
     }
-    // One-shot handoff: consume it so a stale multi-MB capture never
-    // lingers in storage.
-    await browser.storage.local.remove("pendingEdit");
 
     meta.title = pending.title || "";
     meta.domain = pending.domain || "";
 
     baseImg = await fpc.loadImage(pending.dataUrl);
+    // One-shot handoff: consume it only after the image decoded, so a
+    // failure doesn't lose the capture; a stale multi-MB blob never
+    // lingers in storage after a successful load.
+    await browser.storage.local.remove(key);
     canvasWrap.hidden = false;
     setTool("select");
     updateLayout();
@@ -184,9 +191,13 @@
         c.fillText(op.text, op.x, op.y);
         break;
       case "blur": {
-        // Pixelate: downscale the base image region ~1/12 and scale it
-        // back up. Unlike a soft blur, this destroys the underlying
-        // pixels deterministically — it can't be reversed by viewers.
+        // Pixelate: downscale the region ~1/12 and scale it back up.
+        // Unlike a soft blur, this destroys the underlying pixels
+        // deterministically — it can't be reversed by viewers. Sample the
+        // composition rendered so far (not baseImg) so annotations under
+        // the region get pixelated instead of erased. The context is
+        // translated by the crop offset; map to canvas coordinates.
+        const t = c.getTransform();
         const sw = Math.max(1, Math.round(op.w / PIXELATE_FACTOR));
         const sh = Math.max(1, Math.round(op.h / PIXELATE_FACTOR));
         const tmp = document.createElement("canvas");
@@ -194,7 +205,7 @@
         tmp.height = sh;
         const tctx = tmp.getContext("2d");
         tctx.imageSmoothingEnabled = true;
-        tctx.drawImage(baseImg, op.x, op.y, op.w, op.h, 0, 0, sw, sh);
+        tctx.drawImage(c.canvas, op.x + t.e, op.y + t.f, op.w, op.h, 0, 0, sw, sh);
         c.imageSmoothingEnabled = true;
         c.drawImage(tmp, 0, 0, sw, sh, op.x, op.y, op.w, op.h);
         break;
@@ -481,20 +492,13 @@
     try {
       const blob = await fpc.canvasToPngBlob(composeExport());
       const settings = await fpc.getSettings();
-      let ext, out;
-      if (settings.format === "pdf") {
-        ext = "pdf";
-        out = await fpc.imageToPdf(blob, settings.quality);
-      } else {
-        ext = settings.format === "jpeg" ? "jpg" : settings.format;
-        out = await fpc.convertImage(blob, settings.format, settings.quality);
-      }
+      const encoded = await fpc.encodeForSave(blob, settings);
       const result = await browser.runtime.sendMessage({
         action: "download",
-        dataUrl: await fpc.blobToDataUrl(out),
+        dataUrl: await fpc.blobToDataUrl(encoded.blob),
         // The editor tab's own title/hostname would be wrong for {title}
         // and {domain} — use the captured page's, passed via pendingEdit.
-        filename: fpc.buildFilename(settings.filenameTemplate, ext, meta),
+        filename: fpc.buildFilename(settings.filenameTemplate, encoded.ext, meta),
         saveAs: settings.saveAs,
       });
       if (!result || !result.success)

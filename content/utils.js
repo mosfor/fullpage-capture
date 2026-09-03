@@ -129,7 +129,13 @@
       cancel = () => resolve(true);
     });
     const onKey = (e) => {
-      if (e.key === "Escape") cancel();
+      if (e.key === "Escape") {
+        // Swallow the key so it only cancels the capture, not whatever
+        // menu/dialog the user set up on the page during the delay.
+        e.preventDefault();
+        e.stopPropagation();
+        cancel();
+      }
     };
     document.addEventListener("keydown", onKey, true);
 
@@ -153,8 +159,11 @@
     if (cancelled) throw new Error("cancelled");
   };
 
+  // Only JPEG re-encoding is supported: Firefox's canvas.toBlob has no WebP
+  // encoder and silently falls back to PNG for unknown types, so any other
+  // format value passes through as the original PNG.
   fpc.convertImage = async function convertImage(blob, format, quality) {
-    if (format !== "jpeg" && format !== "webp") return blob;
+    if (format !== "jpeg") return blob;
 
     const url = URL.createObjectURL(blob);
     try {
@@ -209,6 +218,23 @@
     return `${name || "capture"}.${ext}`;
   };
 
+  fpc.extForFormat = function extForFormat(format) {
+    return format === "jpeg" ? "jpg" : format;
+  };
+
+  // Encode a PNG capture blob per the user's format settings. Single home
+  // for the format→encoder fork and extension mapping, shared by the
+  // capture path, the editor's Save, and the options-page preview.
+  fpc.encodeForSave = async function encodeForSave(blob, settings) {
+    if (settings.format === "pdf") {
+      return { blob: await fpc.imageToPdf(blob, settings.quality), ext: "pdf" };
+    }
+    return {
+      blob: await fpc.convertImage(blob, settings.format, settings.quality),
+      ext: fpc.extForFormat(settings.format),
+    };
+  };
+
   fpc.outputResult = async function outputResult(image, output) {
     const blob = image instanceof Blob
       ? image
@@ -226,26 +252,11 @@
         throw new Error((result && result.error) || "Failed to open editor");
     } else if (output === "file") {
       const settings = await fpc.getSettings();
-      let ext, dataUrl;
-      if (settings.format === "pdf") {
-        const pdf = await fpc.imageToPdf(blob, settings.quality);
-        ext = "pdf";
-        dataUrl = await fpc.blobToDataUrl(pdf);
-      } else {
-        const converted = await fpc.convertImage(
-          blob,
-          settings.format,
-          settings.quality
-        );
-        ext = settings.format === "jpeg" ? "jpg" : settings.format;
-        dataUrl = converted === blob && !(image instanceof Blob)
-          ? image
-          : await fpc.blobToDataUrl(converted);
-      }
+      const encoded = await fpc.encodeForSave(blob, settings);
       const dlResult = await browser.runtime.sendMessage({
         action: "download",
-        dataUrl,
-        filename: fpc.buildFilename(settings.filenameTemplate, ext),
+        dataUrl: await fpc.blobToDataUrl(encoded.blob),
+        filename: fpc.buildFilename(settings.filenameTemplate, encoded.ext),
         saveAs: settings.saveAs,
       });
       if (!dlResult.success)

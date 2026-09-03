@@ -66,7 +66,7 @@
       fpc.notify("✓");
       return { success: true };
     } catch (e) {
-      if (e.message === "cancelled") return { success: true };
+      if (e.message === "cancelled") return { success: true, cancelled: true };
       fpc.notify("✗ " + e.message);
       return { success: false, error: e.message };
     }
