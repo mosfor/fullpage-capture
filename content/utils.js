@@ -216,15 +216,22 @@
 
     if (output === "file") {
       const settings = await fpc.getSettings();
-      const converted = await fpc.convertImage(
-        blob,
-        settings.format,
-        settings.quality
-      );
-      const ext = settings.format === "jpeg" ? "jpg" : settings.format;
-      const dataUrl = converted === blob && !(image instanceof Blob)
-        ? image
-        : await fpc.blobToDataUrl(converted);
+      let ext, dataUrl;
+      if (settings.format === "pdf") {
+        const pdf = await fpc.imageToPdf(blob, settings.quality);
+        ext = "pdf";
+        dataUrl = await fpc.blobToDataUrl(pdf);
+      } else {
+        const converted = await fpc.convertImage(
+          blob,
+          settings.format,
+          settings.quality
+        );
+        ext = settings.format === "jpeg" ? "jpg" : settings.format;
+        dataUrl = converted === blob && !(image instanceof Blob)
+          ? image
+          : await fpc.blobToDataUrl(converted);
+      }
       const dlResult = await browser.runtime.sendMessage({
         action: "download",
         dataUrl,

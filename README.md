@@ -12,7 +12,8 @@ Minimal Firefox/Zen browser extension that captures screenshots and copies them 
 - **Scroll container detection** — works on pages with inner scrollable areas (dashboards, SPAs)
 - **Sticky/fixed element handling** — fixed elements are hidden and sticky ones (sidebars, TOCs) un-stuck after the first frame, so nothing repeats in the stitched image
 - **Clipboard or file** — output to clipboard or save as file
-- **PNG, JPEG, or WebP** — pick file format and quality on the options page (clipboard is always PNG)
+- **PNG, JPEG, WebP, or PDF** — pick file format and quality on the options page (clipboard is always PNG)
+- **PDF export** — save any capture as a single-page PDF sized to the image; quality applies to JPEG, WebP, and PDF (the PDF embeds a JPEG-compressed image)
 - **Filename templates** — name saved files with `{title}`, `{domain}`, `{date}`, `{time}`, `{timestamp}` variables, and choose whether to see a Save As dialog
 - **Capture delay** — optional 3/5/10-second on-page countdown before the shot (after region selection), so you can set up hover states or open menus; Esc cancels
 - **Keyboard shortcuts** — all configurable via `about:addons`

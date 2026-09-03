@@ -4,6 +4,7 @@
 const CONTENT_SCRIPTS = [
   "/content/settings.js",
   "/content/utils.js",
+  "/content/pdf.js",
   "/content/scroll.js",
   "/content/fixed-elements.js",
   "/content/selection.js",
