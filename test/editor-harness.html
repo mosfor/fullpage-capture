@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Editor harness</title>
+<link rel="stylesheet" href="../editor/editor.css">
+<script>
+// Stub the WebExtension layer so the real editor code runs unmodified.
+// A synthetic capture is preloaded as pendingEdit; download messages are
+// recorded instead of hitting browser.downloads.
+window.__calls = [];
+
+function syntheticCapture(w, h) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "#ddeeff");
+  grad.addColorStop(1, "#ffe8dd");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#333";
+  ctx.font = "24px sans-serif";
+  for (let y = 40; y < h; y += 120) {
+    ctx.fillText("Sample page content, line at y=" + y, 24, y);
+  }
+  return c.toDataURL("image/png");
+}
+
+const storageData = {
+  pendingEdit: {
+    dataUrl: syntheticCapture(900, 1400),
+    title: "Example Page",
+    domain: "example.com",
+  },
+};
+
+window.browser = {
+  storage: {
+    local: {
+      get: async (keys) => {
+        const out = {};
+        for (const k of Array.isArray(keys) ? keys : [keys]) {
+          if (k in storageData) out[k] = storageData[k];
+        }
+        return out;
+      },
+      remove: async (key) => { delete storageData[key]; },
+      set: async (obj) => { Object.assign(storageData, obj); },
+    },
+  },
+  runtime: {
+    sendMessage: async (msg) => {
+      window.__calls.push(msg);
+      return { success: true };
+    },
+  },
+};
+</script>
+</head>
+<body>
+<script>
+// Adopt the real editor markup and scripts so nothing is duplicated here.
+(async () => {
+  const html = await fetch("../editor/editor.html").then((r) => r.text());
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  for (const node of [...doc.body.children]) {
+    if (node.tagName !== "SCRIPT") document.body.appendChild(node);
+  }
+  for (const src of [
+    "../content/settings.js",
+    "../content/utils.js",
+    "../content/pdf.js",
+    "../editor/editor.js",
+  ]) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("failed to load " + src));
+      document.body.appendChild(s);
+    });
+  }
+  window.__editorReady = true;
+})().catch((e) => { window.__editorError = e.message; });
+</script>
+</body>
+</html>

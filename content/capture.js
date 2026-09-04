@@ -285,6 +285,19 @@
     const rect = await fpc.selectRegion();
     if (!rect) throw new Error("cancelled");
 
+    // Optional capture delay AFTER the selection is drawn, so the user can
+    // set up hover states / open dropdowns inside the chosen region. The
+    // rect is viewport-relative, so if the user scrolled during the
+    // countdown, restore the original scroll position to bring the
+    // selected content back into view before shooting the viewport.
+    const preDelayX = window.scrollX;
+    const preDelayY = window.scrollY;
+    await fpc.delayBeforeCapture();
+    if (window.scrollX !== preDelayX || window.scrollY !== preDelayY) {
+      window.scrollTo(preDelayX, preDelayY);
+      await fpc.nextPaint();
+    }
+
     await fpc.sleep(50);
 
     const res = await browser.runtime.sendMessage({
@@ -316,9 +329,92 @@
     return fpc.canvasToPngBlob(canvas);
   };
 
+  fpc.captureElement = async function captureElement(windowId) {
+    const picked = await fpc.selectElement();
+    if (!picked) throw new Error("cancelled");
+
+    // Same as captureRegion: optional delay AFTER the element is picked, so
+    // the user can set up hover states / open dropdowns inside it.
+    await fpc.delayBeforeCapture();
+
+    // The page may have reflowed during the delay (that's what it's for) —
+    // re-measure the element; fall back to the rect from pick time if it
+    // was removed from the DOM.
+    let rect = picked.rect;
+    if (picked.el.isConnected) {
+      const r = picked.el.getBoundingClientRect();
+      rect = {
+        x: r.left + window.scrollX,
+        y: r.top + window.scrollY,
+        width: r.width,
+        height: r.height,
+      };
+
+      // Ancestors with clipping overflow paint only their scrollport:
+      // captureTab renders from layout, so the scrolled-out part of the
+      // element would come out as blank background. Clamp to the portion
+      // that's actually visible inside every clipping ancestor.
+      for (let anc = picked.el.parentElement; anc && anc !== document.documentElement; anc = anc.parentElement) {
+        const style = getComputedStyle(anc);
+        if (style.overflowX === "visible" && style.overflowY === "visible") continue;
+        const ar = anc.getBoundingClientRect();
+        const clipX = ar.left + anc.clientLeft + window.scrollX;
+        const clipY = ar.top + anc.clientTop + window.scrollY;
+        const right = Math.min(rect.x + rect.width, clipX + anc.clientWidth);
+        const bottom = Math.min(rect.y + rect.height, clipY + anc.clientHeight);
+        rect.x = Math.max(rect.x, clipX);
+        rect.y = Math.max(rect.y, clipY);
+        rect.width = right - rect.x;
+        rect.height = bottom - rect.y;
+      }
+      if (rect.width < 1 || rect.height < 1)
+        throw new Error("Element is scrolled out of view");
+    }
+
+    // Direct render (tabs.captureTab + rect) rasterizes the element straight
+    // from layout without scrolling, so elements taller than the viewport
+    // come out whole. Clamp to the page box — captureTab rejects rects that
+    // poke outside it. Clamp against the document, not getPageDimensions():
+    // the rect is in top-level page coordinates even when an inner scroll
+    // container exists.
+    const html = document.documentElement;
+    const pageW = Math.max(html.scrollWidth, html.clientWidth);
+    const pageH = Math.max(html.scrollHeight, html.clientHeight);
+
+    const x = Math.max(0, Math.min(rect.x, pageW));
+    const y = Math.max(0, Math.min(rect.y, pageH));
+    const width = Math.min(rect.x + rect.width, pageW) - x;
+    const height = Math.min(rect.y + rect.height, pageH) - y;
+
+    if (width < 1 || height < 1) throw new Error("Element has no visible area");
+
+    // Same scale handling as captureFullPageDirect: render at devicePixelRatio,
+    // capped so huge elements can't exceed canvas limits.
+    const dpr = window.devicePixelRatio || 1;
+    const MAX_DIM = 32767;
+    const MAX_CANVAS_PIXELS = 100e6;
+    const scale = Math.min(
+      dpr,
+      MAX_DIM / width,
+      MAX_DIM / height,
+      Math.sqrt(MAX_CANVAS_PIXELS / (width * height)),
+    );
+
+    const res = await browser.runtime.sendMessage({
+      action: "captureTab",
+      rect: { x, y, width, height },
+      scale,
+    });
+    if (!res.success) throw new Error(res.error);
+    return res.dataUrl;
+  };
+
   fpc.captureScrollRegion = async function captureScrollRegion(windowId) {
     const rect = await fpc.selectScrollRegion();
     if (!rect) throw new Error("cancelled");
+
+    // Same as captureRegion: delay after selection, before any scrolling.
+    await fpc.delayBeforeCapture();
 
     const dpr = window.devicePixelRatio || 1;
     const dims = fpc.getPageDimensions();

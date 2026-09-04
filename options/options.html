@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <h1>FullPage Capture</h1>
+
+  <div class="setting">
+    <label for="format">Image format</label>
+    <select id="format">
+      <option value="png">PNG</option>
+      <option value="jpeg">JPEG</option>
+      <option value="pdf">PDF</option>
+    </select>
+    <p class="hint">Format applies to file output. Clipboard is always PNG.</p>
+  </div>
+
+  <div class="setting" id="qualityRow">
+    <label for="quality">Quality <span class="value" id="qualityValue">90</span></label>
+    <input type="range" id="quality" min="1" max="100" step="1" value="90">
+    <p class="hint">Used for JPEG and PDF (the image inside the PDF is JPEG-compressed).</p>
+  </div>
+
+  <div class="setting">
+    <label for="filenameTemplate">Filename template</label>
+    <input type="text" id="filenameTemplate" spellcheck="false" autocomplete="off">
+    <p class="hint">Variables: {title}, {domain}, {date}, {time}, {timestamp}</p>
+    <p class="hint">Preview: <span class="preview" id="filenamePreview"></span></p>
+  </div>
+
+  <div class="setting">
+    <label class="checkbox">
+      <input type="checkbox" id="saveAs">
+      Ask where to save each file
+    </label>
+    <p class="hint">When off, files go straight to your downloads folder.</p>
+  </div>
+
+  <div class="setting">
+    <label for="captureDelay">Capture delay</label>
+    <select id="captureDelay">
+      <option value="0">No delay</option>
+      <option value="3">3 seconds</option>
+      <option value="5">5 seconds</option>
+      <option value="10">10 seconds</option>
+    </select>
+    <p class="hint">Countdown before the shot — time to set up hover states or open menus. Esc cancels.</p>
+  </div>
+
+  <script src="../content/settings.js"></script>
+  <script src="../content/utils.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

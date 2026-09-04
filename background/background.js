@@ -2,7 +2,9 @@
 // Handles privileged APIs: captureVisibleTab, keyboard commands, downloads
 
 const CONTENT_SCRIPTS = [
+  "/content/settings.js",
   "/content/utils.js",
+  "/content/pdf.js",
   "/content/scroll.js",
   "/content/fixed-elements.js",
   "/content/selection.js",
@@ -14,6 +16,20 @@ async function injectContentScripts(tabId) {
   for (const file of CONTENT_SCRIPTS) {
     await browser.tabs.executeScript(tabId, { file });
   }
+}
+
+// Editor handoff entries are consumed by the editor tab, but a tab that
+// closes before decoding (or a decode failure kept for retry) leaves a
+// multi-MB blob behind. Sweep anything old enough that no live editor tab
+// can still be waiting on it.
+const STALE_EDIT_MS = 60 * 60 * 1000;
+async function sweepStaleEdits() {
+  const all = await browser.storage.local.get(null);
+  const stale = Object.keys(all).filter((k) =>
+    k.startsWith("pendingEdit") &&
+    !(all[k] && all[k].created > Date.now() - STALE_EDIT_MS)
+  );
+  if (stale.length) await browser.storage.local.remove(stale);
 }
 
 browser.runtime.onMessage.addListener((request, sender) => {
@@ -36,6 +52,36 @@ browser.runtime.onMessage.addListener((request, sender) => {
       .catch((error) => ({ success: false, error: error.message }));
   }
 
+  // Stash the capture in storage.local (survives event page unload) and
+  // open the annotation editor, which reads and removes it. Each capture
+  // gets its own key, passed via the editor URL, so two quick captures
+  // can't overwrite each other. The source tab's title/domain ride along
+  // for {title}/{domain} filename tokens.
+  if (request.action === "openEditor") {
+    const tab = sender.tab;
+    let domain = "";
+    try {
+      domain = new URL(tab && tab.url).hostname;
+    } catch (e) { /* about:blank etc. — leave empty */ }
+    const key = "pendingEdit-" + Date.now().toString(36) +
+      Math.random().toString(36).slice(2, 8);
+    return sweepStaleEdits()
+      .then(() => browser.storage.local.set({
+        [key]: {
+          dataUrl: request.dataUrl,
+          title: (tab && tab.title) || "",
+          domain,
+          created: Date.now(),
+        },
+      }))
+      .then(() => browser.tabs.create({
+        url: browser.runtime.getURL("editor/editor.html") +
+          "?capture=" + key,
+      }))
+      .then(() => ({ success: true }))
+      .catch((error) => ({ success: false, error: error.message }));
+  }
+
   if (request.action === "download") {
     // Convert data URL to blob URL (data URLs can exceed size limits)
     return fetch(request.dataUrl)
@@ -45,7 +91,7 @@ browser.runtime.onMessage.addListener((request, sender) => {
         return browser.downloads.download({
           url: blobUrl,
           filename: request.filename,
-          saveAs: true,
+          saveAs: request.saveAs !== false,
         }).then((id) => {
           // Clean up blob URL after download starts
           setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
@@ -63,6 +109,7 @@ browser.commands.onCommand.addListener(async (command) => {
     "capture-viewport": "viewport",
     "capture-region": "region",
     "capture-scroll-region": "scrollRegion",
+    "capture-element": "element",
   };
 
   const mode = modeMap[command];

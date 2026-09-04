@@ -4,6 +4,7 @@ const fullPageBtn = document.getElementById("fullPageBtn");
 const viewportBtn = document.getElementById("viewportBtn");
 const regionBtn = document.getElementById("regionBtn");
 const scrollRegionBtn = document.getElementById("scrollRegionBtn");
+const elementBtn = document.getElementById("elementBtn");
 const outputToggle = document.getElementById("outputToggle");
 const grid = document.getElementById("grid");
 const overlay = document.getElementById("overlay");
@@ -15,7 +16,9 @@ const status = document.getElementById("status");
 let outputMode = "clipboard";
 
 const CONTENT_SCRIPTS = [
+  "/content/settings.js",
   "/content/utils.js",
+  "/content/pdf.js",
   "/content/scroll.js",
   "/content/fixed-elements.js",
   "/content/selection.js",
@@ -23,9 +26,11 @@ const CONTENT_SCRIPTS = [
   "/content/content.js",
 ];
 
-// Restore saved output preference
+// Restore saved output preference — unless the user already clicked a
+// toggle before this resolved (the click is the fresher choice).
+let outputChosen = false;
 browser.storage.local.get("outputMode").then((data) => {
-  if (data.outputMode) {
+  if (data.outputMode && !outputChosen) {
     outputMode = data.outputMode;
     updateToggle();
   }
@@ -39,6 +44,7 @@ function updateToggle() {
 
 outputToggle.querySelectorAll("button").forEach((btn) => {
   btn.addEventListener("click", () => {
+    outputChosen = true;
     outputMode = btn.dataset.value;
     updateToggle();
     browser.storage.local.set({ outputMode });
@@ -49,11 +55,16 @@ fullPageBtn.addEventListener("click", () => triggerCapture("fullPage"));
 viewportBtn.addEventListener("click", () => triggerCapture("viewport"));
 regionBtn.addEventListener("click", () => triggerCapture("region"));
 scrollRegionBtn.addEventListener("click", () => triggerCapture("scrollRegion"));
+elementBtn.addEventListener("click", () => triggerCapture("element"));
 
 async function triggerCapture(mode) {
   try {
     disableAll();
-    status.textContent = mode === "region" ? "Select a region..." : "Capturing...";
+    status.textContent = mode === "region"
+      ? "Select a region..."
+      : mode === "element"
+        ? "Select an element..."
+        : "Capturing...";
 
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
     if (!tab) throw new Error("No active tab");
@@ -76,8 +87,16 @@ async function triggerCapture(mode) {
       windowId: tab.windowId,
     });
 
-    if (result && result.success) {
-      const msg = outputMode === "file" ? "Saved to file" : "Copied to clipboard";
+    if (result && result.cancelled) {
+      // User pressed Escape (selection or countdown) — nothing was output,
+      // so don't show a false "Saved"/"Copied" confirmation.
+      status.textContent = "";
+    } else if (result && result.success) {
+      const msg = outputMode === "file"
+        ? "Saved to file"
+        : outputMode === "edit"
+          ? "Opening editor"
+          : "Copied to clipboard";
       showOverlay("success", msg);
     } else {
       throw new Error(result?.error || "Capture failed");
@@ -114,6 +133,7 @@ function disableAll() {
   viewportBtn.disabled = true;
   regionBtn.disabled = true;
   scrollRegionBtn.disabled = true;
+  elementBtn.disabled = true;
 }
 
 function enableAll() {
@@ -121,4 +141,5 @@ function enableAll() {
   viewportBtn.disabled = false;
   regionBtn.disabled = false;
   scrollRegionBtn.disabled = false;
+  elementBtn.disabled = false;
 }

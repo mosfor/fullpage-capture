@@ -38,11 +38,15 @@
     try {
       let dataUrl;
 
+      // Capture delay runs up front for fullPage/viewport; region modes
+      // delay after the selection is drawn instead (see capture.js).
       switch (mode) {
         case "fullPage":
+          await fpc.delayBeforeCapture();
           dataUrl = await fpc.captureFullPage(windowId);
           break;
         case "viewport":
+          await fpc.delayBeforeCapture();
           dataUrl = await fpc.captureViewport(windowId);
           break;
         case "region":
@@ -50,6 +54,9 @@
           break;
         case "scrollRegion":
           dataUrl = await fpc.captureScrollRegion(windowId);
+          break;
+        case "element":
+          dataUrl = await fpc.captureElement(windowId);
           break;
         default:
           throw new Error("Unknown capture mode");
@@ -59,7 +66,7 @@
       fpc.notify("✓");
       return { success: true };
     } catch (e) {
-      if (e.message === "cancelled") return { success: true };
+      if (e.message === "cancelled") return { success: true, cancelled: true };
       fpc.notify("✗ " + e.message);
       return { success: false, error: e.message };
     }

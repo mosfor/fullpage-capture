@@ -116,6 +116,228 @@
     });
   };
 
+  fpc.selectElement = function selectElement() {
+    return new Promise((resolve) => {
+      // Highlight box: pointer-events none, so elementFromPoint sees the page
+      // through it — no full-screen overlay needed (it would swallow hits).
+      const box = document.createElement("div");
+      Object.assign(box.style, {
+        position: "fixed",
+        border: "2px solid #4A90D9",
+        background: "rgba(74,144,217,0.15)",
+        display: "none",
+        zIndex: "2147483647",
+        pointerEvents: "none",
+        boxSizing: "border-box",
+      });
+
+      // Devtools-style tooltip: tag/id/class and rendered size
+      const tooltip = document.createElement("div");
+      Object.assign(tooltip.style, {
+        position: "fixed",
+        display: "none",
+        padding: "4px 8px",
+        borderRadius: "4px",
+        background: "rgba(0,0,0,0.85)",
+        color: "#fff",
+        font: "12px system-ui, sans-serif",
+        whiteSpace: "nowrap",
+        pointerEvents: "none",
+        zIndex: "2147483647",
+      });
+
+      // Instructions
+      const hint = document.createElement("div");
+      Object.assign(hint.style, {
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        padding: "12px 20px",
+        borderRadius: "8px",
+        background: "rgba(0,0,0,0.7)",
+        color: "#fff",
+        font: "14px system-ui, sans-serif",
+        pointerEvents: "none",
+        zIndex: "2147483647",
+      });
+      hint.textContent =
+        "Click an element to capture · Scroll or ↑↓ to expand · Esc to cancel";
+
+      document.body.appendChild(box);
+      document.body.appendChild(tooltip);
+      document.body.appendChild(hint);
+
+      let hoverEl = null; // element directly under the cursor
+      let depth = 0; // ancestor steps above hoverEl (wheel/arrow expansion)
+      let lastX = -1,
+        lastY = -1;
+
+      function resolveTarget() {
+        let el = hoverEl;
+        for (let i = 0; i < depth && el; i++) {
+          const parent = el.parentElement;
+          if (!parent || parent === document.documentElement) break;
+          el = parent;
+        }
+        return el;
+      }
+
+      function describe(el) {
+        let name = el.tagName.toLowerCase();
+        if (el.id) name += "#" + el.id;
+        else if (el.classList.length > 0) name += "." + el.classList[0];
+        return name;
+      }
+
+      function updateHighlight() {
+        const el = resolveTarget();
+        if (!el) {
+          box.style.display = "none";
+          tooltip.style.display = "none";
+          return;
+        }
+        const r = el.getBoundingClientRect();
+        box.style.left = r.left + "px";
+        box.style.top = r.top + "px";
+        box.style.width = r.width + "px";
+        box.style.height = r.height + "px";
+        box.style.display = "block";
+
+        tooltip.textContent =
+          `${describe(el)} · ${Math.round(r.width)} × ${Math.round(r.height)}`;
+        tooltip.style.display = "block";
+        const th = tooltip.offsetHeight || 24;
+        const tw = tooltip.offsetWidth || 120;
+        // Above the box when there's room, otherwise just inside its top edge
+        const top = r.top - th - 6 >= 0
+          ? r.top - th - 6
+          : Math.min(Math.max(r.top + 6, 6), window.innerHeight - th - 6);
+        tooltip.style.top = top + "px";
+        tooltip.style.left =
+          Math.max(6, Math.min(r.left, window.innerWidth - tw - 6)) + "px";
+      }
+
+      function refreshHover(clientX, clientY) {
+        // box/tooltip/hint are pointer-events:none, so they never hit here
+        const el = document.elementFromPoint(clientX, clientY);
+        if (el && el !== document.documentElement && el !== hoverEl) {
+          hoverEl = el;
+          depth = 0; // new element under cursor resets the ancestor stack
+        }
+        updateHighlight();
+      }
+
+      function expand(dir) {
+        const cur = resolveTarget();
+        if (!cur) return;
+        if (dir > 0) {
+          const parent = cur.parentElement;
+          if (parent && parent !== document.documentElement) depth++;
+        } else if (depth > 0) {
+          depth--;
+        }
+        updateHighlight();
+      }
+
+      function onMove(e) {
+        lastX = e.clientX;
+        lastY = e.clientY;
+        hint.style.display = "none";
+        refreshHover(e.clientX, e.clientY);
+      }
+
+      function onScrollOrResize() {
+        if (lastX >= 0) refreshHover(lastX, lastY);
+        else updateHighlight();
+      }
+
+      // Wheel expands to parent / back to child instead of scrolling the page
+      function onWheel(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        expand(e.deltaY < 0 ? 1 : -1);
+      }
+
+      function onKey(e) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          finish(null);
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          e.stopPropagation();
+          expand(1);
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          e.stopPropagation();
+          expand(-1);
+        }
+      }
+
+      // Capture-phase: the confirming click must never reach links/buttons
+      function block(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+
+      function onClick(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Hit-test at the click position too: a click with no prior
+        // mousemove (e.g. right after a keyboard-triggered start) would
+        // otherwise find no hover element and leave the selection hanging.
+        refreshHover(e.clientX, e.clientY);
+        const el = resolveTarget();
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        // Page coordinates: viewport rect + top-level scroll offsets. The
+        // element rides along so the caller can re-measure after a capture
+        // delay (the page may reflow while a dropdown is opened).
+        finish({
+          el,
+          rect: {
+            x: r.left + window.scrollX,
+            y: r.top + window.scrollY,
+            width: r.width,
+            height: r.height,
+          },
+        });
+      }
+
+      function cleanup() {
+        box.remove();
+        tooltip.remove();
+        hint.remove();
+        document.removeEventListener("mousemove", onMove, true);
+        document.removeEventListener("mousedown", block, true);
+        document.removeEventListener("mouseup", block, true);
+        document.removeEventListener("click", onClick, true);
+        document.removeEventListener("keydown", onKey, true);
+        document.removeEventListener("wheel", onWheel, true);
+        window.removeEventListener("scroll", onScrollOrResize, true);
+        window.removeEventListener("resize", onScrollOrResize);
+      }
+
+      async function finish(result) {
+        cleanup();
+        // The highlight/tooltip must never appear in the shot: wait two rAFs
+        // for their removal to actually paint before any capture fires.
+        await fpc.nextPaint();
+        resolve(result);
+      }
+
+      document.addEventListener("mousemove", onMove, true);
+      document.addEventListener("mousedown", block, true);
+      document.addEventListener("mouseup", block, true);
+      document.addEventListener("click", onClick, true);
+      document.addEventListener("keydown", onKey, true);
+      document.addEventListener("wheel", onWheel, { capture: true, passive: false });
+      window.addEventListener("scroll", onScrollOrResize, true);
+      window.addEventListener("resize", onScrollOrResize);
+    });
+  };
+
   fpc.selectScrollRegion = function selectScrollRegion() {
     return new Promise((resolve) => {
       const container = document.createElement("div");
