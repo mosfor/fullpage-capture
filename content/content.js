@@ -28,6 +28,9 @@
       case "hideFixedElements":
         fpc.hideFixed(request.selectors);
         return Promise.resolve({ success: true });
+      case "cancelCapture":
+        fpc.cancelDelay();
+        return Promise.resolve({ success: true });
       case "restoreFixedElements":
         fpc.restoreFixed();
         return Promise.resolve({ success: true });

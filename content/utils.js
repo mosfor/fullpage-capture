@@ -97,6 +97,13 @@
   // countdown element is removed and a paint awaited BEFORE resolving so it
   // can never appear in the capture; its class deliberately avoids "fixed"/
   // "sticky" substrings so the fixed-element hider never targets it either.
+  // The popup can cancel a running countdown too (Escape there closes the
+  // popup rather than reaching the page's keydown listener).
+  let activeCancel = null;
+  fpc.cancelDelay = function cancelDelay() {
+    if (activeCancel) activeCancel();
+  };
+
   fpc.delayBeforeCapture = async function delayBeforeCapture() {
     const settings = await fpc.getSettings();
     const seconds = Math.max(0, parseInt(settings.captureDelay, 10) || 0);
@@ -128,6 +135,7 @@
     const cancelPromise = new Promise((resolve) => {
       cancel = () => resolve(true);
     });
+    activeCancel = cancel;
     const onKey = (e) => {
       if (e.key === "Escape") {
         // Swallow the key so it only cancels the capture, not whatever
@@ -156,6 +164,7 @@
         ]);
       }
     } finally {
+      activeCancel = null;
       document.removeEventListener("keydown", onKey, true);
       document.removeEventListener("visibilitychange", onVisibility);
       // Must not appear in the shot: remove, then wait two rAFs for the
