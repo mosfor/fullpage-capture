@@ -87,16 +87,27 @@
   const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline class="draw" pathLength="1" points="20 6 9 17 4 12"/></svg>';
   const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line class="draw" pathLength="1" x1="18" y1="6" x2="6" y2="18"/><line class="draw second" pathLength="1" x1="6" y1="6" x2="18" y2="18"/></svg>';
 
+  // Hosts are tracked here, not looked up by id, so a page element that
+  // happens to share the id is never touched.
+  const overlayHosts = new Map();
+
   function mountOverlay(id) {
-    const old = document.getElementById(id);
+    const old = overlayHosts.get(id);
     if (old) old.remove();
     const host = document.createElement("div");
     host.id = id;
+    overlayHosts.set(id, host);
     host.setAttribute("style", "position:fixed!important;inset:0!important;z-index:2147483647!important;pointer-events:none!important;");
     const root = host.attachShadow({ mode: "closed" });
     root.innerHTML = `<style>${OVERLAY_CSS}</style><div class="stage"></div>`;
     (document.body || document.documentElement).appendChild(host);
     return { host, stage: root.querySelector(".stage") };
+  }
+
+  function unmountOverlay(id) {
+    const host = overlayHosts.get(id);
+    if (host) host.remove();
+    overlayHosts.delete(id);
   }
 
   // Restart a CSS animation on an element (used for each countdown tick)
@@ -109,11 +120,21 @@
   let notifyTimer = null;
   let notifyHost = null;
 
+  // Take down a result disc that is still showing. Returns true if there
+  // was one, so callers can wait a paint before capturing.
+  fpc.dismissNotify = function dismissNotify() {
+    if (notifyTimer) clearTimeout(notifyTimer);
+    notifyTimer = null;
+    const had = !!notifyHost;
+    unmountOverlay("_fullpage-capture-notify");
+    notifyHost = null;
+    return had;
+  };
+
   // Centered result disc: a check mark or cross that draws itself, with the
   // outcome spelled out underneath. kind is "success" or "error".
   fpc.notify = function notify(kind, text) {
-    if (notifyTimer) clearTimeout(notifyTimer);
-    if (notifyHost) notifyHost.remove();
+    fpc.dismissNotify();
     const ok = kind === "success";
     const { host, stage } = mountOverlay("_fullpage-capture-notify");
     notifyHost = host;
@@ -135,7 +156,7 @@
     notifyTimer = setTimeout(() => {
       wrap.classList.add("out");
       notifyTimer = setTimeout(() => {
-        host.remove();
+        unmountOverlay("_fullpage-capture-notify");
         notifyHost = null;
         notifyTimer = null;
       }, 320);
@@ -226,7 +247,7 @@
       // Must not appear in the shot: remove the overlay, then wait two rAFs
       // for the removal to paint before any capture fires (rAF is paused in
       // hidden tabs, so skip the wait there — nothing paints anyway).
-      host.remove();
+      unmountOverlay("_fullpage-capture-countdown");
       if (!document.hidden) await fpc.nextPaint();
     }
 

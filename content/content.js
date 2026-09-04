@@ -46,6 +46,9 @@
     // A cancel request can only refer to a capture that has already been
     // triggered; anything left over from before this one is stale.
     fpc.clearCancelRequest();
+    // A result disc from the previous capture may still be on screen; a
+    // zero-delay capture would otherwise photograph it.
+    if (fpc.dismissNotify()) await fpc.nextPaint();
     try {
       let dataUrl;
 

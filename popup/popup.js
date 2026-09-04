@@ -329,6 +329,9 @@ async function capture() {
   if (phase !== "idle") return;
   menuOpen = false;
   clearTimeout(resetTimer);
+  // Mark busy before the first await so a double-click or a second key
+  // press can't start a concurrent capture.
+  setPhase("capturing");
 
   try {
     await injectContentScripts(tab.id);
