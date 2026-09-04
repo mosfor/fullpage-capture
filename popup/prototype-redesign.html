@@ -143,8 +143,10 @@ svg { display: block; }
 .va { perspective: 1200px; }
 .va .card { display: grid; position: relative; transform-style: preserve-3d; transition: transform .55s var(--ease-out), height .45s var(--ease-out); }
 .va.settings .card { transform: rotateY(180deg); }
-.va .face { grid-area: 1 / 1; backface-visibility: hidden; padding: 12px 12px 12px; }
-.va .back { transform: rotateY(180deg); position: absolute; inset: 0; overflow: auto; }
+.va .face { grid-area: 1 / 1; backface-visibility: hidden; padding: 12px 12px 12px; background: var(--paper); transition: visibility 0s .27s; }
+.va .back { transform: rotateY(180deg); position: absolute; inset: 0; overflow: auto; visibility: hidden; }
+.va.settings .back { visibility: visible; }
+.va.settings .front { visibility: hidden; }
 .va .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .va .head h1 { font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
 .va .gear { width: 26px; height: 26px; border-radius: 6px; color: var(--graphite); display: grid; place-items: center; transition: transform .4s var(--ease-out), background .15s; }
@@ -218,16 +220,16 @@ svg { display: block; }
 .va.fail .frame { animation: shake .4s ease; }
 .va.fail .frame::after { content: ""; position: absolute; inset: 0; background: rgba(217,56,56,.08); }
 
-/* mode dial */
-.va .dial { position: relative; margin: 12px -12px 0; height: 34px; overflow: hidden; }
-.va .dial::before, .va .dial::after { content: ""; position: absolute; top: 0; bottom: 0; width: 34px; z-index: 2; pointer-events: none; }
-.va .dial::before { left: 0; background: linear-gradient(90deg, var(--paper), transparent); }
-.va .dial::after { right: 0; background: linear-gradient(-90deg, var(--paper), transparent); }
-.va .dial .track { display: flex; gap: 4px; position: absolute; left: 0; top: 0; height: 100%; align-items: center; transition: transform .35s var(--ease-out); padding-left: 150px; }
-.va .dial button { white-space: nowrap; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--graphite); transition: color .2s, background .2s, transform .2s; }
-.va .dial button:hover { color: var(--ink); }
-.va .dial button.on { color: var(--ink); font-weight: 600; background: var(--wash); }
-.va .dial .notch { position: absolute; left: 50%; bottom: 0; width: 2px; height: 4px; background: var(--ink); transform: translateX(-50%); border-radius: 1px; }
+/* mode strip: all five visible, icon + label, sliding puck */
+.va .modes { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; margin-top: 12px; padding: 3px; background: var(--wash); border-radius: 10px; }
+.va .modes .puck { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 14px) / 5); background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.14); transition: transform .3s var(--spring); }
+.va .modes button { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 2px 6px; border-radius: 8px; color: var(--graphite); font-size: 10px; font-weight: 500; letter-spacing: -.01em; transition: color .2s, transform .15s; }
+.va .modes button svg { width: 16px; height: 16px; }
+.va .modes button:hover { color: var(--ink); }
+.va .modes button:active { transform: scale(.95); }
+.va .modes button.on { color: var(--signal); font-weight: 600; }
+.va .modes button.on span { color: var(--ink); }
+.va .scrub-hint { margin-top: 6px; text-align: center; font-size: 10px; color: var(--graphite); opacity: .8; }
 
 /* shutter */
 .va .shutter { margin-top: 10px; position: relative; width: 100%; height: 44px; border-radius: 10px; background: var(--ink); color: #fff; font-weight: 600; font-size: 13px; overflow: hidden; transition: transform .12s, background .3s; }
@@ -419,11 +421,11 @@ const I = {
   back: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
 };
 const MODES = [
-  { id: 'fullPage', name: 'Full page', short: 'Whole page, top to bottom', desc: 'The whole page, top to bottom, in one image.', key: '1' },
-  { id: 'viewport', name: 'Visible area', short: 'What is on screen now', desc: 'Just what is on screen right now.', key: '2' },
-  { id: 'region', name: 'Region', short: 'Drag a rectangle', desc: 'Drag a rectangle over the part you want.', key: '3' },
-  { id: 'scrollRegion', name: 'Scrolling region', short: 'Drag, then it scrolls', desc: 'Drag a rectangle, then it scrolls to capture everything below it.', key: '4' },
-  { id: 'element', name: 'Element', short: 'Click a block on the page', desc: 'Hover to highlight a block on the page, click to capture it.', key: '5' },
+  { id: 'fullPage', name: 'Full page', label: 'Full page', short: 'Whole page, top to bottom', desc: 'The whole page, top to bottom, in one image.', key: '1' },
+  { id: 'viewport', name: 'Visible area', label: 'Visible', short: 'What is on screen now', desc: 'Just what is on screen right now.', key: '2' },
+  { id: 'region', name: 'Region', label: 'Region', short: 'Drag a rectangle', desc: 'Drag a rectangle over the part you want.', key: '3' },
+  { id: 'scrollRegion', name: 'Scrolling region', label: 'Scrolling', short: 'Drag, then it scrolls', desc: 'Drag a rectangle, then it scrolls to capture everything below it.', key: '4' },
+  { id: 'element', name: 'Element', label: 'Element', short: 'Click a block on the page', desc: 'Hover to highlight a block on the page, click to capture it.', key: '5' },
 ];
 const DESTS = [
   { id: 'clipboard', name: 'Clipboard', hint: 'Paste with Ctrl+V', verb: 'Copy', done: 'Copied to clipboard' },
@@ -439,7 +441,7 @@ const s = {
   phase: 'idle', count: 0, countStart: 0, tickStart: 0,
   delay: 0, outcome: 'success', settings: false, menu: false, focusIdx: -1,
   error: "Can't capture this page",
-  dialOffset: 0, cardH: 0, popH: 0,
+  cardH: 0, popH: 0,
 };
 if (!VARIANTS[s.variant]) s.variant = 'A';
 let timers = [];
@@ -509,7 +511,7 @@ function renderA() {
    <div class="card" style="${s.cardH ? `height:${s.cardH}px` : ''}">
     <div class="face front">
       <div class="head"><h1>FullPage Capture</h1><button class="gear" data-act="settings" title="Settings">${I.gear}</button></div>
-      <div class="frame">
+      <div class="frame" data-scrub>
         <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
         <div class="thumb"><div class="sheet">
           <div class="ln w"></div><div class="ln"></div><div class="ln" style="width:85%"></div><div class="ln img"></div><div class="ln"></div><div class="ln" style="width:70%"></div><div class="ln img"></div><div class="ln"></div>
@@ -520,9 +522,9 @@ function renderA() {
         <button class="chip" data-act="chipmenu">${s.phase === 'success' ? I.check.replace('class="check-draw"','') : I[d.id]} ${d.name} ${I.caret}</button>
         ${s.menu ? `<div class="chip-menu">${DESTS.map(x => `<button data-set-dest="${x.id}" class="${x.id === s.dest ? 'on' : ''}">${I[x.id]} ${x.name}</button>`).join('')}</div>` : ''}
       </div>
-      <div class="dial" data-dial>
-        <div class="track" style="transform:translateX(${s.dialOffset}px)">${MODES.map(x => `<button data-select-mode="${x.id}" class="${x.id === s.mode ? 'on' : ''}">${x.name}</button>`).join('')}</div>
-        <div class="notch"></div>
+      <div class="modes" data-scrub>
+        <div class="puck" style="transform:translateX(calc(${MODES.findIndex(x => x.id === s.mode)} * (100% + 2px)))"></div>
+        ${MODES.map(x => `<button data-select-mode="${x.id}" class="${x.id === s.mode ? 'on' : ''}" title="${x.desc}">${I[x.id]}<span>${x.label}</span></button>`).join('')}
       </div>
       <button class="shutter" data-act="shutter" ${busy() && s.phase !== 'fail' ? 'disabled' : ''}><span class="lbl">${shutter}</span></button>
     </div>
@@ -542,12 +544,6 @@ function sizeCardA() {
   const card = document.querySelector('.va .card'); if (!card) return;
   const target = s.settings ? card.querySelector('.back').scrollHeight : card.querySelector('.front').offsetHeight;
   if (target !== s.cardH) { requestAnimationFrame(() => { card.style.height = target + 'px'; s.cardH = target; }); }
-}
-function positionDial() {
-  const dial = document.querySelector('[data-dial]'); if (!dial) return;
-  const track = dial.firstElementChild, on = track.querySelector('.on');
-  const target = dial.clientWidth / 2 - (on.offsetLeft + on.offsetWidth / 2);
-  if (Math.abs(target - s.dialOffset) > .5) { s.dialOffset = target; requestAnimationFrame(() => { track.style.transform = `translateX(${target}px)`; }); }
 }
 
 // ---------------------------------------------------------------- B - Command list
@@ -630,7 +626,7 @@ function renderC() {
 const root = document.getElementById('root');
 function render() {
   root.innerHTML = { A: renderA, B: renderB, C: renderC }[s.variant]();
-  if (s.variant === 'A') { positionDial(); sizeCardA(); }
+  if (s.variant === 'A') sizeCardA();
   if (s.variant === 'C') sizePopupC();
   document.getElementById('vname').innerHTML = `${s.variant}<small>${VARIANTS[s.variant]}</small>`;
   document.querySelectorAll('.proto-bar [data-set-delay]').forEach(b => b.classList.toggle('on', +b.dataset.setDelay === +s.delay));
@@ -639,7 +635,7 @@ function render() {
     `variant=${s.variant} mode=${s.mode} dest=${s.dest} phase=${s.phase}${s.phase === 'countdown' ? ' count=' + s.count : ''} settings=${s.settings} delay=${s.delay}s outcome=${s.outcome} format=${s.format}`;
 }
 function setVariant(v) {
-  clearTimers(); s.phase = 'idle'; s.settings = false; s.menu = false; s.focusIdx = -1; s.dialOffset = 0; s.cardH = 0; s.popH = 0;
+  clearTimers(); s.phase = 'idle'; s.settings = false; s.menu = false; s.focusIdx = -1; s.cardH = 0; s.popH = 0;
   s.variant = v;
   const u = new URL(location); u.searchParams.set('variant', v); history.replaceState(null, '', u);
   render();
@@ -669,12 +665,21 @@ document.addEventListener('click', (e) => {
   if ('setOutcome' in d) { s.outcome = d.setOutcome; return render(); }
   if ('setFormat' in d) { s.format = d.setFormat; return render(); }
 });
-// Mode dial: wheel scrubs through modes (A)
+// Wheel over the frame or the mode strip scrubs modes (A). Accumulate to a
+// threshold and add a cooldown so one physical notch (which Firefox may
+// deliver as several events, or in line units) moves exactly one step.
+let scrubAcc = 0, scrubLast = 0;
 document.addEventListener('wheel', (e) => {
-  const dial = e.target.closest('[data-dial]'); if (!dial || busy()) return;
+  if (!e.target.closest('[data-scrub]') || busy() || s.settings) return;
   e.preventDefault();
+  const raw = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  scrubAcc += e.deltaMode === 1 ? raw * 16 : e.deltaMode === 2 ? raw * 100 : raw;
+  if (Math.abs(scrubAcc) < 40) return;
+  const dir = Math.sign(scrubAcc); scrubAcc = 0;
+  if (Date.now() - scrubLast < 220) return;
+  scrubLast = Date.now();
   const i = MODES.findIndex(m => m.id === s.mode);
-  const n = Math.max(0, Math.min(MODES.length - 1, i + Math.sign(e.deltaY || e.deltaX)));
+  const n = Math.max(0, Math.min(MODES.length - 1, i + dir));
   if (n !== i) { s.mode = MODES[n].id; render(); }
 }, { passive: false });
 
