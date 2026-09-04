@@ -6,6 +6,11 @@
   window._fullPageCaptureInjected = true;
 
   const fpc = window.FullPageCapture;
+  const DONE_LABEL = {
+    clipboard: "Copied to clipboard",
+    file: "Saved to file",
+    edit: "Opening editor",
+  };
 
   browser.runtime.onMessage.addListener((request) => {
     switch (request.action) {
@@ -69,11 +74,11 @@
       }
 
       await fpc.outputResult(dataUrl, output);
-      fpc.notify("✓");
+      fpc.notify("success", DONE_LABEL[output] || "Captured");
       return { success: true };
     } catch (e) {
       if (e.message === "cancelled") return { success: true, cancelled: true };
-      fpc.notify("✗ " + e.message);
+      fpc.notify("error", e.message);
       return { success: false, error: e.message };
     }
   }

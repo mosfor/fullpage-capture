@@ -19,7 +19,8 @@
       <div class="frame" id="frame">
         <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
         <div class="thumb" id="thumb">
-          <img id="thumbImg" alt="" hidden>
+          <img id="thumbImg" class="viewport" alt="" hidden>
+          <img id="thumbFull" alt="" hidden>
           <div class="sheet" id="sheet">
             <div class="ln w"></div><div class="ln"></div><div class="ln s"></div><div class="ln img"></div>
             <div class="ln"></div><div class="ln s"></div><div class="ln img"></div><div class="ln"></div>
@@ -66,6 +67,10 @@
         <label>File format<small>Clipboard is always PNG</small></label>
         <div class="seg" id="segFormat"></div>
       </div>
+      <div class="opt stack" id="qualityRow">
+        <label for="quality">Quality<small id="qualityValue"></small></label>
+        <input type="range" id="quality" min="1" max="100">
+      </div>
       <div class="opt">
         <label>Delay<small>Time to open menus first</small></label>
         <div class="seg" id="segDelay"></div>
@@ -74,10 +79,12 @@
         <label>Ask where to save</label>
         <button class="toggle" id="saveAsToggle" aria-pressed="true" title="Ask where to save"></button>
       </div>
-      <div class="opt">
-        <label>File name<small id="filenamePreview"></small></label>
+      <div class="opt stack">
+        <label for="template">File name</label>
+        <input type="text" id="template" spellcheck="false" autocomplete="off">
+        <div class="vars" id="vars"></div>
+        <div class="preview" id="filenamePreview"></div>
       </div>
-      <button class="all" id="allSettings">All settings <span>&#8250;</span></button>
     </section>
 
   </div>

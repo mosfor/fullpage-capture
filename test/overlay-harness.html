@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Overlay harness</title>
+<style>
+  body { margin: 0; font-family: sans-serif; background: #f4f4f6; }
+  .page { padding: 40px 80px; }
+  .page .b { background: #fff; border-radius: 4px; margin-bottom: 14px; }
+  .page .b.h { height: 34px; width: 55%; } .page .b.p { height: 12px; width: 90%; } .page .b.img { height: 220px; }
+</style>
+<script>
+// Stub only what the on-page overlay needs. ?show=success|error|countdown
+// picks the overlay, ?delay= the countdown length.
+const q = new URLSearchParams(location.search);
+window.browser = { storage: { local: { get: async () => ({ captureDelay: +(q.get("delay") || 3) }) } } };
+</script>
+</head>
+<body>
+<div class="page">
+  <div class="b h"></div><div class="b p"></div><div class="b p"></div><div class="b img"></div>
+  <div class="b p"></div><div class="b p"></div><div class="b img"></div><div class="b p"></div>
+</div>
+<script src="../content/settings.js"></script>
+<script src="../content/utils.js"></script>
+<script>
+const fpc = window.FullPageCapture;
+const show = q.get("show") || "success";
+if (show === "success") fpc.notify("success", "Copied to clipboard");
+else if (show === "error") fpc.notify("error", "Can't capture this page");
+else fpc.delayBeforeCapture().then(() => { document.title = "countdown done"; }, (e) => { document.title = e.message; });
+</script>
+</body>
+</html>

@@ -48,6 +48,7 @@ const card = $("card");
 const frame = $("frame");
 const thumb = $("thumb");
 const thumbImg = $("thumbImg");
+const thumbFull = $("thumbFull");
 const sheet = $("sheet");
 const hl = $("hl");
 const timer = $("timer");
@@ -72,6 +73,8 @@ let menuOpen = false;
 let countdownTimer = null;
 let resetTimer = null;
 let cardHeight = 0;
+let thumbLoaded = false;
+let fullThumb = "none"; // none | loading | ready | failed
 
 // ---------------------------------------------------------------- init
 
@@ -93,8 +96,13 @@ async function init() {
   }
   render();
 
-  if (!restricted) loadThumbnail();
+  if (!restricted) {
+    loadThumbnail();
+    if (wantsFullPreview()) loadFullThumbnail();
+  }
 }
+
+const wantsFullPreview = () => mode === "fullPage" || mode === "scrollRegion";
 
 function isRestricted(url) {
   return !url ||
@@ -112,13 +120,54 @@ async function loadThumbnail() {
       quality: 60,
     });
     thumbImg.onload = () => {
-      sheet.hidden = true;
-      thumbImg.hidden = false;
-      positionHighlight();
+      thumbLoaded = true;
+      render();
     };
     thumbImg.src = dataUrl;
   } catch (e) {
     /* wireframe stays */
+  }
+}
+
+// Full-page preview for the modes that reach below the fold. One render of
+// the page from layout via captureTab at thumbnail scale, so the bitmap is
+// small (300 px wide) and the cost is one paint, run after the popup has
+// already opened with the viewport thumbnail. Capped at 8000 CSS px tall;
+// content that hasn't lazy-loaded yet shows as it currently is.
+async function loadFullThumbnail() {
+  if (fullThumb !== "none" || restricted) return;
+  fullThumb = "loading";
+  try {
+    const [dims] = await browser.tabs.executeScript(tab.id, {
+      code: "({ w: document.documentElement.clientWidth, vh: window.innerHeight, " +
+        "h: Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0) })",
+    });
+    const height = Math.min(dims.h, 8000);
+    if (height <= dims.vh + 40) {
+      // Nothing beyond the fold: the viewport thumbnail already tells the truth
+      fullThumb = "failed";
+      return;
+    }
+    const scale = Math.min(1, (150 * (window.devicePixelRatio || 1)) / dims.w);
+    const dataUrl = await browser.tabs.captureTab(tab.id, {
+      format: "jpeg",
+      quality: 55,
+      rect: { x: 0, y: 0, width: dims.w, height },
+      scale,
+    });
+    await new Promise((resolve, reject) => {
+      thumbFull.onload = resolve;
+      thumbFull.onerror = reject;
+      thumbFull.src = dataUrl;
+    });
+    // Pan speed follows the page length: ~1 s per 500 px, within 4–14 s
+    const cssHeight = thumbFull.naturalHeight * (150 / thumbFull.naturalWidth);
+    thumbFull.style.setProperty("--pan-dur", Math.max(4, Math.min(14, cssHeight / 60)) + "s");
+    thumbFull.dataset.pan = cssHeight > 122 ? "1" : "";
+    fullThumb = "ready";
+    render();
+  } catch (e) {
+    fullThumb = "failed";
   }
 }
 
@@ -139,6 +188,13 @@ function buildStatic() {
   buildSeg($("segOutput"), OUTPUTS.map((o) => [o.id, o.label]), "outputMode");
   buildSeg($("segFormat"), [["png", "PNG"], ["jpeg", "JPEG"], ["pdf", "PDF"]], "format");
   buildSeg($("segDelay"), [["0", "Off"], ["3", "3s"], ["5", "5s"], ["10", "10s"]], "captureDelay");
+  ["title", "domain", "date", "time", "timestamp"].forEach((v) => {
+    const b = document.createElement("button");
+    b.dataset.var = v;
+    b.textContent = `{${v}}`;
+    b.title = `Insert {${v}}`;
+    $("vars").appendChild(b);
+  });
 }
 
 function buildSeg(el, items, key) {
@@ -183,11 +239,23 @@ function render() {
   // Countdown overlay
   timer.hidden = phase !== "countdown";
 
+  // Thumbnail: full-page render for modes that reach below the fold
+  const showFull = fullThumb === "ready" && wantsFullPreview();
+  thumbFull.hidden = !showFull;
+  thumbFull.classList.toggle("pan", showFull && thumbFull.dataset.pan === "1");
+  thumbImg.hidden = showFull || !thumbLoaded;
+  sheet.hidden = showFull || thumbLoaded;
+
   // Settings face
   document.querySelectorAll(".seg button").forEach((b) => {
     b.classList.toggle("on", String(settings[b.dataset.key]) === b.dataset.value);
   });
   $("saveAsToggle").setAttribute("aria-pressed", String(!!settings.saveAs));
+  $("quality").value = settings.quality;
+  $("qualityValue").textContent = settings.format === "png" ? "PNG is lossless" : settings.quality + "%";
+  $("qualityRow").classList.toggle("disabled", settings.format === "png");
+  const tpl = $("template");
+  if (document.activeElement !== tpl) tpl.value = settings.filenameTemplate;
   filenamePreview.textContent = previewFilename();
 
   positionHighlight();
@@ -215,8 +283,9 @@ function positionHighlight() {
   const t = thumb.getBoundingClientRect();
   const x = t.left - f.left, y = t.top - f.top, w = t.width, h = t.height;
   const toBottom = f.height - y + 4; // run off the bottom edge: "continues below"
+  const showFull = !thumbFull.hidden;
   const geo = {
-    fullPage: [x, y, w, toBottom],
+    fullPage: showFull ? [x, y, w, h] : [x, y, w, toBottom],
     viewport: [x, y, w, h],
     region: [x + w * 0.2, y + h * 0.28, w * 0.6, h * 0.42],
     scrollRegion: [x + w * 0.2, y + h * 0.28, w * 0.6, toBottom],
@@ -360,6 +429,7 @@ function selectMode(id) {
   if (phase !== "idle" && phase !== "fail") return;
   mode = id;
   browser.storage.local.set({ lastMode: id });
+  if (wantsFullPreview() && !restricted) loadFullThumbnail();
   render();
 }
 
@@ -410,10 +480,28 @@ document.addEventListener("click", (e) => {
   }
   if (t.closest("#saveAsToggle")) return setSetting("saveAs", !settings.saveAs);
 
-  if (t.closest("#allSettings")) {
-    browser.runtime.openOptionsPage();
-    window.close();
+  const varBtn = t.closest("#vars button");
+  if (varBtn) {
+    const tpl = $("template");
+    const at = tpl.selectionStart ?? tpl.value.length;
+    const token = `{${varBtn.dataset.var}}`;
+    const next = tpl.value.slice(0, at) + token + tpl.value.slice(tpl.selectionEnd ?? at);
+    tpl.value = next;
+    tpl.focus();
+    tpl.setSelectionRange(at + token.length, at + token.length);
+    return setSetting("filenameTemplate", next);
   }
+});
+
+$("quality").addEventListener("input", () => {
+  settings.quality = parseInt($("quality").value, 10);
+  render();
+});
+$("quality").addEventListener("change", () => {
+  browser.storage.local.set({ quality: settings.quality });
+});
+$("template").addEventListener("input", () => {
+  setSetting("filenameTemplate", $("template").value);
 });
 
 // Wheel over the frame or the mode strip scrubs through modes. Accumulate
@@ -442,7 +530,9 @@ function stepMode(dir) {
 }
 
 document.addEventListener("keydown", (e) => {
+  const typing = e.target.tagName === "INPUT";
   if (e.key === "Escape") {
+    if (typing) { e.target.blur(); e.preventDefault(); return; }
     // Stopping a running countdown beats closing UI: a screenshot the user
     // is trying to abort must not fire because the settings face was open.
     if (phase === "countdown") { cancelCountdown(); e.preventDefault(); }
@@ -450,7 +540,7 @@ document.addEventListener("keydown", (e) => {
     else if (settingsOpen) { settingsOpen = false; render(); e.preventDefault(); }
     return; // otherwise Firefox closes the popup, which is what Escape should do
   }
-  if (settingsOpen) return;
+  if (settingsOpen || typing) return;
   const idle = phase === "idle" || phase === "fail";
   if (/^[1-5]$/.test(e.key) && idle && !e.altKey && !e.ctrlKey && !e.metaKey) {
     selectMode(MODES[+e.key - 1].id);

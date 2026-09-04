@@ -17,7 +17,8 @@
   --signal: #2F6FED;
   --signal-soft: #E8EFFD;
   --confirm: #1F9D55;
-  --fail: #D93838;
+  --fail: #E11B1B;
+  --fail-soft: rgba(225, 27, 27, .08);
   --lamp: #F0A020;
   --lamp-ink: #B8740A;
   --ease-out: cubic-bezier(.2, .8, .2, 1);
@@ -32,7 +33,6 @@ body {
   font-size: 13px;
   color: var(--ink);
   overflow: hidden;
-  perspective: 1200px;
 }
 button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; }
 button:disabled { cursor: default; }
@@ -44,30 +44,19 @@ svg { display: block; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
-/* ---- Card with two faces (front: capture, back: settings) ---- */
-.card {
-  display: grid;
-  position: relative;
-  transform-style: preserve-3d;
-  transition: transform .55s var(--ease-out), height .45s var(--ease-out);
-}
-.popup.settings .card { transform: rotateY(180deg); }
-.face {
-  grid-area: 1 / 1;
-  backface-visibility: hidden;
-  padding: 12px;
-  background: var(--paper);
-  transition: visibility 0s .27s;
-}
+/* ---- Card with two faces (front: capture, back: settings) ----
+   The back slides in from the right while the front eases away; the card's
+   height follows whichever face is showing. */
+.card { position: relative; overflow: hidden; transition: height .3s var(--ease-out); }
+.face { padding: 12px; background: var(--paper); }
+.front { transition: transform .28s var(--ease-out), opacity .22s ease; }
+.popup.settings .front { transform: translateX(-32px); opacity: 0; pointer-events: none; }
 .back {
-  transform: rotateY(180deg);
-  position: absolute;
-  inset: 0;
-  overflow: auto;
-  visibility: hidden;
+  position: absolute; inset: 0; overflow: auto;
+  transform: translateX(100%); visibility: hidden;
+  transition: transform .3s var(--ease-out), visibility 0s .3s;
 }
-.popup.settings .back { visibility: visible; }
-.popup.settings .front { visibility: hidden; }
+.popup.settings .back { transform: none; visibility: visible; transition: transform .3s var(--ease-out); }
 
 header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 header h1 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
@@ -108,7 +97,13 @@ header h1 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-
   box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
   background: #fff;
 }
-.thumb img { display: block; width: 100%; max-height: 122px; object-fit: cover; object-position: top; }
+.thumb { max-height: 122px; }
+.thumb img { display: block; width: 100%; }
+.thumb img.viewport { max-height: 122px; object-fit: cover; object-position: top; }
+/* Full-page preview taller than the frame: pan down and back slowly so the
+   whole page is seen; the highlight covers the thumb, meaning "all of it". */
+.thumb img.pan { animation: pan var(--pan-dur, 8s) ease-in-out 1.2s infinite alternate; }
+@keyframes pan { from { transform: translateY(0); } to { transform: translateY(calc(-100% + 122px)); } }
 .sheet { padding: 8px; }
 .sheet .ln { height: 5px; border-radius: 2px; background: #d7d9db; margin-bottom: 5px; }
 .sheet .ln.w { width: 60%; height: 8px; background: #c3c6ca; }
@@ -176,7 +171,7 @@ header h1 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-
 .popup.success .thumb { animation: fly .6s var(--ease-out) forwards; }
 .popup.fail .frame { animation: shake .4s ease; }
 .popup.fail .frame::after, .popup.blocked .frame::after {
-  content: ""; position: absolute; inset: 0; background: rgba(217, 56, 56, .08);
+  content: ""; position: absolute; inset: 0; background: var(--fail-soft);
 }
 
 /* ---- Mode strip ---- */
@@ -238,12 +233,20 @@ header h1 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-
 }
 .toggle[aria-pressed="true"] { background: var(--signal); }
 .toggle[aria-pressed="true"]::after { transform: translateX(14px); }
-.all {
-  display: flex; align-items: center; justify-content: space-between; width: 100%;
-  margin-top: 10px; padding: 9px 12px; border-radius: 8px;
-  background: var(--signal-soft); color: var(--signal); font-weight: 600; font-size: 12px;
+.opt.stack { flex-direction: column; align-items: stretch; gap: 6px; }
+.opt.stack label { display: flex; justify-content: space-between; align-items: baseline; }
+.opt.stack label small { margin-top: 0; }
+.opt.disabled { opacity: .45; pointer-events: none; }
+.opt input[type="range"] { width: 100%; accent-color: var(--signal); cursor: pointer; }
+.opt input[type="text"] {
+  width: 100%; padding: 6px 8px; font: inherit; font-size: 12px; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; background: #fff;
 }
-.all:hover { background: #dbe6fc; }
+.opt input[type="text"]:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 2px var(--signal-soft); }
+.vars { font-size: 10.5px; color: var(--graphite); display: flex; flex-wrap: wrap; gap: 4px; }
+.vars button { font-size: 10.5px; padding: 1px 5px; border-radius: 4px; background: var(--wash); color: var(--ink); }
+.vars button:hover { background: var(--signal-soft); color: var(--signal); }
+.preview { font-size: 11px; color: var(--graphite); overflow-wrap: anywhere; }
 
 /* ---- Keyframes ---- */
 @keyframes drain { to { stroke-dashoffset: 1; } }

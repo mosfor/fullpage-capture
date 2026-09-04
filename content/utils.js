@@ -45,58 +45,108 @@
     });
   };
 
-  let notifyTimer = null;
+  // ---- On-page overlay: countdown, success, failure ----
+  // Lives in a closed shadow root so page CSS can't restyle it and ours
+  // can't leak. Hosts are removed as soon as they're done (and before any
+  // capture), so the fixed-element hider never meets them.
+  const OVERLAY_CSS = `
+    :host { all: initial; }
+    .stage { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .wrap { display: grid; justify-items: center; }
+    .wrap.out { animation: fpc-fade .3s ease-in forwards; }
+    .disc { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+      box-shadow: 0 12px 36px rgba(0,0,0,.28); animation: fpc-pop .45s cubic-bezier(.34,1.56,.64,1); }
+    .disc svg { width: 42px; height: 42px; }
+    .disc.ok { background: #1F9D55; }
+    .disc.bad { background: #E11B1B; animation: fpc-pop .45s cubic-bezier(.34,1.56,.64,1), fpc-shake .4s ease .4s; }
+    .draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: fpc-draw .4s ease-out .18s forwards; }
+    .draw.second { animation-delay: .32s; }
+    .label { margin-top: 12px; max-width: 70vw; padding: 7px 13px; border-radius: 999px; background: rgba(20,22,26,.88);
+      color: #fff; font-size: 13px; font-weight: 600; line-height: 1.25; text-align: center;
+      animation: fpc-rise .35s ease-out .2s both; }
+    .count { position: relative; width: 132px; height: 132px; display: grid; place-items: center; border-radius: 50%;
+      background: rgba(255,255,255,.94); box-shadow: 0 14px 44px rgba(0,0,0,.3);
+      animation: fpc-pop .4s cubic-bezier(.34,1.56,.64,1); }
+    .count svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .count circle { fill: none; stroke-width: 5; }
+    .count .track { stroke: rgba(240,160,32,.22); }
+    .count .arc { stroke: #F0A020; stroke-linecap: round; stroke-dasharray: 1; transform: rotate(-90deg);
+      transform-origin: center; animation: fpc-drain 1s linear forwards; }
+    .count .num { font-size: 60px; font-weight: 600; line-height: 1; letter-spacing: -.04em; color: #F0A020;
+      font-variant-numeric: tabular-nums; animation: fpc-digit .25s ease-out; }
+    @keyframes fpc-pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+    @keyframes fpc-draw { to { stroke-dashoffset: 0; } }
+    @keyframes fpc-rise { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes fpc-fade { to { opacity: 0; transform: scale(.92); } }
+    @keyframes fpc-drain { to { stroke-dashoffset: 1; } }
+    @keyframes fpc-digit { from { transform: translateY(10px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes fpc-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); } }
+    @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; } }
+  `;
+  const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline class="draw" pathLength="1" points="20 6 9 17 4 12"/></svg>';
+  const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line class="draw" pathLength="1" x1="18" y1="6" x2="6" y2="18"/><line class="draw second" pathLength="1" x1="6" y1="6" x2="18" y2="18"/></svg>';
 
-  fpc.notify = function notify(text) {
-    let el = document.getElementById("_fullpage-capture-notify");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "_fullpage-capture-notify";
-      el.setAttribute("style", [
-        "position:fixed!important",
-        "top:20px!important",
-        "left:50%!important",
-        "transform:translateX(-50%) scale(0)!important",
-        "z-index:2147483647!important",
-        "width:56px!important",
-        "height:56px!important",
-        "border-radius:50%!important",
-        "display:flex!important",
-        "align-items:center!important",
-        "justify-content:center!important",
-        "box-shadow:0 4px 16px rgba(0,0,0,.2)!important",
-        "transition:opacity .3s,transform .3s cubic-bezier(0.34,1.56,0.64,1)!important",
-        "pointer-events:none!important",
-        "opacity:0!important",
-        "padding:0!important",
-        "margin:0!important",
-        "overflow:hidden!important",
-        "box-sizing:border-box!important",
-        "line-height:1!important",
-      ].join(";"));
-      document.body.appendChild(el);
-    }
-    const isError = text.startsWith("✗");
-    el.style.setProperty("background", isError ? "#d32f2f" : "#2e7d32", "important");
-    el.textContent = isError ? "×" : "✓";
-    el.style.setProperty("color", "#fff", "important");
-    el.style.setProperty("font", "700 30px system-ui, sans-serif", "important");
-    el.style.setProperty("opacity", "1", "important");
-    el.style.setProperty("transform", "translateX(-50%) scale(1)", "important");
+  function mountOverlay(id) {
+    const old = document.getElementById(id);
+    if (old) old.remove();
+    const host = document.createElement("div");
+    host.id = id;
+    host.setAttribute("style", "position:fixed!important;inset:0!important;z-index:2147483647!important;pointer-events:none!important;");
+    const root = host.attachShadow({ mode: "closed" });
+    root.innerHTML = `<style>${OVERLAY_CSS}</style><div class="stage"></div>`;
+    (document.body || document.documentElement).appendChild(host);
+    return { host, stage: root.querySelector(".stage") };
+  }
+
+  // Restart a CSS animation on an element (used for each countdown tick)
+  function replay(el) {
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+  }
+
+  let notifyTimer = null;
+  let notifyHost = null;
+
+  // Centered result disc: a check mark or cross that draws itself, with the
+  // outcome spelled out underneath. kind is "success" or "error".
+  fpc.notify = function notify(kind, text) {
     if (notifyTimer) clearTimeout(notifyTimer);
+    if (notifyHost) notifyHost.remove();
+    const ok = kind === "success";
+    const { host, stage } = mountOverlay("_fullpage-capture-notify");
+    notifyHost = host;
+
+    const wrap = document.createElement("div");
+    wrap.className = "wrap";
+    const disc = document.createElement("div");
+    disc.className = "disc " + (ok ? "ok" : "bad");
+    disc.innerHTML = ok ? ICON_CHECK : ICON_X;
+    wrap.appendChild(disc);
+    if (text) {
+      const label = document.createElement("div");
+      label.className = "label";
+      label.textContent = text;
+      wrap.appendChild(label);
+    }
+    stage.appendChild(wrap);
+
     notifyTimer = setTimeout(() => {
-      el.style.setProperty("opacity", "0", "important");
-      el.style.setProperty("transform", "translateX(-50%) scale(0.8)", "important");
-      notifyTimer = null;
-    }, 1500);
+      wrap.classList.add("out");
+      notifyTimer = setTimeout(() => {
+        host.remove();
+        notifyHost = null;
+        notifyTimer = null;
+      }, 320);
+    }, ok ? 1400 : 2800);
   };
 
-  // Capture delay: shows an on-page countdown for `captureDelay` seconds so
-  // the user can set up hover states or open dropdowns before the shot.
-  // Escape cancels (throws "cancelled", handled silently upstream). The
-  // countdown element is removed and a paint awaited BEFORE resolving so it
-  // can never appear in the capture; its class deliberately avoids "fixed"/
-  // "sticky" substrings so the fixed-element hider never targets it either.
+  // Capture delay: shows a centered on-page countdown for `captureDelay`
+  // seconds so the user can set up hover states or open dropdowns before
+  // the shot. Escape cancels (throws "cancelled", handled silently
+  // upstream). The overlay is removed and a paint awaited BEFORE resolving
+  // so it can never appear in the capture.
   // The popup can cancel a running countdown too (Escape there closes the
   // popup rather than reaching the page's keydown listener). A Set, not a
   // slot: overlapping countdowns (popup + keyboard command) must all stop,
@@ -125,27 +175,17 @@
     }
     if (seconds === 0) return;
 
-    const el = document.createElement("div");
-    el.className = "_fullpage-capture-countdown";
-    el.setAttribute("style", [
-      "position:fixed!important",
-      "top:20px!important",
-      "right:20px!important",
-      "z-index:2147483647!important",
-      "min-width:48px!important",
-      "padding:8px 12px!important",
-      "border-radius:8px!important",
-      "background:rgba(0,0,0,0.75)!important",
-      "color:#fff!important",
-      "font:700 20px system-ui, sans-serif!important",
-      "text-align:center!important",
-      "pointer-events:none!important",
-      "box-shadow:0 4px 16px rgba(0,0,0,.2)!important",
-      "margin:0!important",
-      "box-sizing:border-box!important",
-      "line-height:1.2!important",
-    ].join(";"));
-    document.body.appendChild(el);
+    const { host, stage } = mountOverlay("_fullpage-capture-countdown");
+    stage.innerHTML = '<div class="wrap"><div class="count"><svg viewBox="0 0 132 132">' +
+      '<circle class="track" cx="66" cy="66" r="62"/><circle class="arc" cx="66" cy="66" r="62" pathLength="1"/>' +
+      '</svg><div class="num"></div></div><div class="label">Esc to cancel</div></div>';
+    const num = stage.querySelector(".num");
+    const arc = stage.querySelector(".arc");
+    const showCount = (n) => {
+      num.textContent = n;
+      replay(num);
+      replay(arc);
+    };
 
     let cancel;
     const cancelPromise = new Promise((resolve) => {
@@ -173,7 +213,7 @@
     let cancelled = document.hidden;
     try {
       for (let remaining = seconds; remaining > 0 && !cancelled; remaining--) {
-        el.textContent = remaining + "…";
+        showCount(remaining);
         cancelled = await Promise.race([
           fpc.sleep(1000).then(() => false),
           cancelPromise,
@@ -183,10 +223,10 @@
       activeCancels.delete(cancel);
       document.removeEventListener("keydown", onKey, true);
       document.removeEventListener("visibilitychange", onVisibility);
-      // Must not appear in the shot: remove, then wait two rAFs for the
-      // removal to actually paint before any capture fires (rAF is paused
-      // in hidden tabs, so skip the wait there — nothing paints anyway).
-      el.remove();
+      // Must not appear in the shot: remove the overlay, then wait two rAFs
+      // for the removal to paint before any capture fires (rAF is paused in
+      // hidden tabs, so skip the wait there — nothing paints anyway).
+      host.remove();
       if (!document.hidden) await fpc.nextPaint();
     }
 

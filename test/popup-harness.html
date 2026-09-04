@@ -28,7 +28,9 @@ function syntheticPage(w, h) {
   ctx.fillStyle = "#d7d9db";
   ctx.fillRect(40, 80, w * .5, 28);
   for (let y = 130; y < h; y += 26) ctx.fillRect(40, y, w * (.55 + .3 * Math.sin(y)), 10);
-  ctx.fillStyle = "#c3d5f0"; ctx.fillRect(w * .62, 80, w * .33, 200);
+  ctx.fillStyle = "#c3d5f0";
+  for (let y = 80; y < h; y += 900) ctx.fillRect(w * .62, y, w * .33, 200);
+  ctx.fillStyle = "#1F9D55"; ctx.fillRect(0, h - 60, w, 60); // footer marks the page end
   return c.toDataURL("image/jpeg", .7);
 }
 
@@ -49,7 +51,13 @@ window.browser = {
     query: async () => [{ id: 7, windowId: 1, title: "Getting started · Example Docs",
       url: q.get("restricted") ? "about:addons" : "https://docs.example.com/guides/getting-started" }],
     captureVisibleTab: async () => syntheticPage(1280, 800),
-    executeScript: async () => { if (q.get("noinject")) throw new Error("Missing host permission"); return [true]; },
+    // ?pageh= controls how tall the fake page is (default 3600; 800 = nothing below the fold)
+    captureTab: async (tabId, opts) => syntheticPage(Math.round(opts.rect.width * opts.scale), Math.round(opts.rect.height * opts.scale)),
+    executeScript: async (tabId, opts) => {
+      if (q.get("noinject")) throw new Error("Missing host permission");
+      if (opts.code) return [{ w: 1280, vh: 800, h: +(q.get("pageh") || 3600) }];
+      return [true];
+    },
     sendMessage: async (tabId, msg) => {
       window.__calls.push(msg);
       if (msg.action === "cancelCapture") return { success: true };
