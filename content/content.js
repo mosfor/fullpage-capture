@@ -6,6 +6,11 @@
   window._fullPageCaptureInjected = true;
 
   const fpc = window.FullPageCapture;
+  const DONE_LABEL = {
+    clipboard: "Copied to clipboard",
+    file: "Saved to file",
+    edit: "Opening editor",
+  };
 
   browser.runtime.onMessage.addListener((request) => {
     switch (request.action) {
@@ -28,6 +33,9 @@
       case "hideFixedElements":
         fpc.hideFixed(request.selectors);
         return Promise.resolve({ success: true });
+      case "cancelCapture":
+        fpc.cancelDelay();
+        return Promise.resolve({ success: true });
       case "restoreFixedElements":
         fpc.restoreFixed();
         return Promise.resolve({ success: true });
@@ -35,6 +43,12 @@
   });
 
   async function capture(mode, output, windowId) {
+    // A cancel request can only refer to a capture that has already been
+    // triggered; anything left over from before this one is stale.
+    fpc.clearCancelRequest();
+    // A result disc from the previous capture may still be on screen; a
+    // zero-delay capture would otherwise photograph it.
+    if (fpc.dismissNotify()) await fpc.nextPaint();
     try {
       let dataUrl;
 
@@ -63,11 +77,11 @@
       }
 
       await fpc.outputResult(dataUrl, output);
-      fpc.notify("✓");
+      fpc.notify("success", DONE_LABEL[output] || "Captured");
       return { success: true };
     } catch (e) {
       if (e.message === "cancelled") return { success: true, cancelled: true };
-      fpc.notify("✗ " + e.message);
+      fpc.notify("error", e.message);
       return { success: false, error: e.message };
     }
   }

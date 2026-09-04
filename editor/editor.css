@@ -203,7 +203,7 @@ body {
   transform: translateX(-50%) translateY(8px);
   padding: 8px 16px;
   border-radius: 10px;
-  background: #2e7d32;
+  background: #1F9D55;
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -211,7 +211,7 @@ body {
   pointer-events: none;
   transition: opacity 0.25s, transform 0.25s;
 }
-.toast.error { background: #d32f2f; }
+.toast.error { background: #E11B1B; }
 .toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);

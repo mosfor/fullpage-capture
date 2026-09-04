@@ -16,7 +16,9 @@ Minimal Firefox/Zen browser extension that captures screenshots and copies them 
 - **PNG, JPEG, or PDF** — pick file format and quality on the options page (clipboard is always PNG)
 - **PDF export** — save any capture as a single-page PDF sized to the image; quality applies to JPEG and PDF (the PDF embeds a JPEG-compressed image)
 - **Filename templates** — name saved files with `{title}`, `{domain}`, `{date}`, `{time}`, `{timestamp}` variables, and choose whether to see a Save As dialog
-- **Capture delay** — optional 3/5/10-second on-page countdown before the shot (after region selection), so you can set up hover states or open menus; Esc cancels
+- **Capture delay** — optional 3/5/10-second countdown before the shot (after region selection), shown centered on the page so you can set up hover states or open menus; Esc cancels. Success and failure show as a centered check or cross with the outcome spelled out
+- **Viewfinder popup** — a thumbnail of the current tab shows what each mode will grab (the whole page, panning, for full-page and scrolling modes); pick a mode by click, wheel, arrow keys or 1–5, hit the shutter. Countdown, success and failure play out in the frame
+- **All settings in the popup** — the card slides over to destination, format, quality, delay, save dialog and filename template with a live preview; no trip through about:addons needed
 - **Keyboard shortcuts** — all configurable via `about:addons`
 - **Performance optimized** — reduced jank on large pages
 

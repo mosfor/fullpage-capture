@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Popup harness</title>
+<link rel="stylesheet" href="../popup/popup.css">
+<style>
+  /* Sit the 300px popup on a neutral backdrop so its edges are visible */
+  html, body { background: #d9d9de !important; }
+  body { width: auto !important; padding: 24px; perspective: none !important; }
+  #app { width: 300px; background: var(--paper); border-radius: 8px; border: 1px solid rgba(0,0,0,.14); box-shadow: 0 4px 16px rgba(0,0,0,.18); overflow: hidden; perspective: 1200px; }
+</style>
+<script>
+// Stub the WebExtension layer so the real popup code runs unmodified.
+// URL params drive the stub: ?outcome=success|fail|cancelled controls what
+// the fake content script answers, ?ms= how long it takes, ?restricted=1
+// pretends the tab is an about: page, ?demo=settings|shutter performs that
+// interaction after load so a screenshot can catch the state.
+window.__calls = [];
+const q = new URLSearchParams(location.search);
+
+function syntheticPage(w, h) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = "#1c1b22"; ctx.fillRect(0, 0, w, 48);
+  ctx.fillStyle = "#d7d9db";
+  ctx.fillRect(40, 80, w * .5, 28);
+  for (let y = 130; y < h; y += 26) ctx.fillRect(40, y, w * (.55 + .3 * Math.sin(y)), 10);
+  ctx.fillStyle = "#c3d5f0";
+  for (let y = 80; y < h; y += 900) ctx.fillRect(w * .62, y, w * .33, 200);
+  ctx.fillStyle = "#1F9D55"; ctx.fillRect(0, h - 60, w, 60); // footer marks the page end
+  return c.toDataURL("image/jpeg", .7);
+}
+
+const storageData = { outputMode: q.get("output") || "clipboard", captureDelay: +(q.get("delay") || 0), lastMode: q.get("mode") || "fullPage" };
+
+window.browser = {
+  storage: { local: {
+    get: async (keys) => {
+      if (keys === null) return { ...storageData };
+      const out = {};
+      for (const k of Array.isArray(keys) ? keys : [keys]) if (k in storageData) out[k] = storageData[k];
+      return out;
+    },
+    set: async (obj) => { Object.assign(storageData, obj); window.__calls.push({ set: obj }); },
+    remove: async () => {},
+  } },
+  tabs: {
+    query: async () => [{ id: 7, windowId: 1, title: "Getting started · Example Docs",
+      url: q.get("restricted") ? "about:addons" : "https://docs.example.com/guides/getting-started" }],
+    captureVisibleTab: async () => syntheticPage(1280, 800),
+    // ?pageh= controls how tall the fake page is (default 3600; 800 = nothing below the fold)
+    captureTab: async (tabId, opts) => syntheticPage(Math.round(opts.rect.width * opts.scale), Math.round(opts.rect.height * opts.scale)),
+    executeScript: async (tabId, opts) => {
+      if (q.get("noinject")) throw new Error("Missing host permission");
+      if (opts.code) return [{ w: 1280, vh: 800, h: +(q.get("pageh") || 3600) }];
+      return [true];
+    },
+    sendMessage: async (tabId, msg) => {
+      window.__calls.push(msg);
+      if (msg.action === "cancelCapture") return { success: true };
+      await new Promise((r) => setTimeout(r, +(q.get("ms") || 600) + (storageData.captureDelay * 1000)));
+      const outcome = q.get("outcome") || "success";
+      if (outcome === "fail") return { success: false, error: "Can't capture this page" };
+      if (outcome === "cancelled") return { success: true, cancelled: true };
+      return { success: true };
+    },
+  },
+  runtime: { openOptionsPage: () => window.__calls.push({ openOptionsPage: true }) },
+};
+window.close = () => window.__calls.push({ close: true });
+</script>
+</head>
+<body>
+<script>
+// Adopt the real popup markup and scripts so nothing is duplicated here.
+(async () => {
+  const html = await fetch("../popup/popup.html").then((r) => r.text());
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  for (const node of [...doc.body.children]) {
+    if (node.tagName !== "SCRIPT") document.body.appendChild(node);
+  }
+  for (const src of ["../content/settings.js", "../content/utils.js", "../popup/popup.js"]) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src; s.onload = resolve;
+      s.onerror = () => reject(new Error("failed to load " + src));
+      document.body.appendChild(s);
+    });
+  }
+  await new Promise((r) => setTimeout(r, 150));
+  const demo = q.get("demo");
+  if (demo === "settings") document.getElementById("settingsBtn").click();
+  if (demo === "shutter") document.getElementById("shutter").click();
+  if (demo === "menu") document.getElementById("chip").click();
+  window.__popupReady = true;
+})().catch((e) => { window.__popupError = e.message; document.title = "ERROR " + e.message; });
+</script>
+</body>
+</html>
