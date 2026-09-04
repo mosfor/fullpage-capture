@@ -38,6 +38,9 @@
   });
 
   async function capture(mode, output, windowId) {
+    // A cancel request can only refer to a capture that has already been
+    // triggered; anything left over from before this one is stale.
+    fpc.clearCancelRequest();
     try {
       let dataUrl;
 

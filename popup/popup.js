@@ -443,9 +443,11 @@ function stepMode(dir) {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (menuOpen) { menuOpen = false; render(); e.preventDefault(); }
+    // Stopping a running countdown beats closing UI: a screenshot the user
+    // is trying to abort must not fire because the settings face was open.
+    if (phase === "countdown") { cancelCountdown(); e.preventDefault(); }
+    else if (menuOpen) { menuOpen = false; render(); e.preventDefault(); }
     else if (settingsOpen) { settingsOpen = false; render(); e.preventDefault(); }
-    else if (phase === "countdown") { cancelCountdown(); e.preventDefault(); }
     return; // otherwise Firefox closes the popup, which is what Escape should do
   }
   if (settingsOpen) return;

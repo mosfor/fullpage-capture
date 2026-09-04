@@ -98,15 +98,31 @@
   // can never appear in the capture; its class deliberately avoids "fixed"/
   // "sticky" substrings so the fixed-element hider never targets it either.
   // The popup can cancel a running countdown too (Escape there closes the
-  // popup rather than reaching the page's keydown listener).
-  let activeCancel = null;
+  // popup rather than reaching the page's keydown listener). A Set, not a
+  // slot: overlapping countdowns (popup + keyboard command) must all stop,
+  // and one finishing must not drop another's hook. If the request lands
+  // before a countdown is cancellable (still loading settings), remember
+  // it and let the next delayBeforeCapture consume it.
+  const activeCancels = new Set();
+  let cancelRequested = false;
   fpc.cancelDelay = function cancelDelay() {
-    if (activeCancel) activeCancel();
+    if (activeCancels.size === 0) {
+      cancelRequested = true;
+      return;
+    }
+    for (const cancel of activeCancels) cancel();
+  };
+  fpc.clearCancelRequest = function clearCancelRequest() {
+    cancelRequested = false;
   };
 
   fpc.delayBeforeCapture = async function delayBeforeCapture() {
     const settings = await fpc.getSettings();
     const seconds = Math.max(0, parseInt(settings.captureDelay, 10) || 0);
+    if (cancelRequested) {
+      cancelRequested = false;
+      throw new Error("cancelled");
+    }
     if (seconds === 0) return;
 
     const el = document.createElement("div");
@@ -135,7 +151,7 @@
     const cancelPromise = new Promise((resolve) => {
       cancel = () => resolve(true);
     });
-    activeCancel = cancel;
+    activeCancels.add(cancel);
     const onKey = (e) => {
       if (e.key === "Escape") {
         // Swallow the key so it only cancels the capture, not whatever
@@ -164,7 +180,7 @@
         ]);
       }
     } finally {
-      activeCancel = null;
+      activeCancels.delete(cancel);
       document.removeEventListener("keydown", onKey, true);
       document.removeEventListener("visibilitychange", onVisibility);
       // Must not appear in the shot: remove, then wait two rAFs for the
