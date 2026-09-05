@@ -17,7 +17,7 @@ const CONTENT_SCRIPTS = [
 ];
 
 const SVG = (body, extra = "") =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${extra}>${body}</svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${extra}>${body}</svg>`;
 
 const MODES = [
   { id: "fullPage", label: "Full page", name: "full page", key: "1", waiting: null, desc: "The whole page, top to bottom, in one image",
@@ -41,6 +41,18 @@ const OUTPUTS = [
     icon: SVG('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>') },
 ];
 const CHECK = SVG('<polyline points="20 6 9 17 4 12"/>', 'stroke-width="3"');
+
+// Icons are constant SVG strings authored above; parse them into nodes so
+// nothing is ever assigned through innerHTML.
+const svgParser = new DOMParser();
+const svgNode = (markup) =>
+  svgParser.parseFromString(markup, "image/svg+xml").documentElement;
+const el = (tag, className, text) => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
 
 const $ = (id) => document.getElementById(id);
 const app = $("app");
@@ -176,13 +188,13 @@ function buildStatic() {
     const b = document.createElement("button");
     b.dataset.mode = m.id;
     b.title = `${m.desc} (Alt+Shift+${m.key})`;
-    b.innerHTML = `${m.icon}<span>${m.label}</span>`;
+    b.append(svgNode(m.icon), el("span", "", m.label));
     modes.appendChild(b);
   });
   OUTPUTS.forEach((o) => {
     const b = document.createElement("button");
     b.dataset.output = o.id;
-    b.innerHTML = `${o.icon}<span>${o.label}</span>`;
+    b.append(svgNode(o.icon), el("span", "", o.label));
     chipMenu.appendChild(b);
   });
   buildSeg($("segOutput"), OUTPUTS.map((o) => [o.id, o.label]), "outputMode");
@@ -224,7 +236,7 @@ function render() {
   });
 
   // Chip
-  $("chipIcon").innerHTML = phase === "success" ? CHECK : out.icon;
+  $("chipIcon").replaceChildren(svgNode(phase === "success" ? CHECK : out.icon));
   $("chipLabel").textContent = out.label;
   chipMenu.hidden = !menuOpen;
   chipMenu.querySelectorAll("button").forEach((b) => {
@@ -234,7 +246,7 @@ function render() {
   // Shutter
   const busyish = phase !== "idle" && phase !== "fail";
   shutter.disabled = busyish;
-  shutterLabel.innerHTML = shutterText(m, out);
+  shutterLabel.replaceChildren(...shutterContent(m, out));
 
   // Countdown overlay
   timer.hidden = phase !== "countdown";
@@ -262,18 +274,22 @@ function render() {
   sizeCard();
 }
 
-function shutterText(m, out) {
-  const kbd = `<span class="kbd"><b>Alt</b><b>Shift</b><b>${m.key}</b></span>`;
+function shutterContent(m, out) {
+  const kbd = () => {
+    const k = el("span", "kbd");
+    k.append(el("b", "", "Alt"), el("b", "", "Shift"), el("b", "", m.key));
+    return k;
+  };
   switch (phase) {
-    case "idle": return `Capture ${m.name} ${kbd}`;
-    case "waiting": return m.waiting || "Capturing…";
-    case "countdown": return "Set up the page…";
-    case "capturing": return "Capturing…";
-    case "success": return out.done;
-    case "fail": return `${error} <span class="retry">Retry</span>`;
-    case "blocked": return error;
+    case "idle": return [`Capture ${m.name} `, kbd()];
+    case "waiting": return [m.waiting || "Capturing…"];
+    case "countdown": return ["Set up the page…"];
+    case "capturing": return ["Capturing…"];
+    case "success": return [out.done];
+    case "fail": return [`${error} `, el("span", "retry", "Retry")];
+    case "blocked": return [error];
   }
-  return "";
+  return [];
 }
 
 // The highlight tracks the thumbnail's rendered box so it works for both
