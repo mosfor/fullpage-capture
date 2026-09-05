@@ -84,8 +84,11 @@
     @keyframes fpc-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); } }
     @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; } }
   `;
-  const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline class="draw" pathLength="1" points="20 6 9 17 4 12"/></svg>';
-  const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line class="draw" pathLength="1" x1="18" y1="6" x2="6" y2="18"/><line class="draw second" pathLength="1" x1="6" y1="6" x2="18" y2="18"/></svg>';
+  // Constant SVG markup parsed into nodes rather than assigned as HTML
+  const svgNode = (markup) =>
+    new DOMParser().parseFromString(markup, "image/svg+xml").documentElement;
+  const ICON_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline class="draw" pathLength="1" points="20 6 9 17 4 12"/></svg>';
+  const ICON_X = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line class="draw" pathLength="1" x1="18" y1="6" x2="6" y2="18"/><line class="draw second" pathLength="1" x1="6" y1="6" x2="18" y2="18"/></svg>';
 
   // Hosts are tracked here, not looked up by id, so a page element that
   // happens to share the id is never touched.
@@ -99,9 +102,13 @@
     overlayHosts.set(id, host);
     host.setAttribute("style", "position:fixed!important;inset:0!important;z-index:2147483647!important;pointer-events:none!important;");
     const root = host.attachShadow({ mode: "closed" });
-    root.innerHTML = `<style>${OVERLAY_CSS}</style><div class="stage"></div>`;
+    const style = document.createElement("style");
+    style.textContent = OVERLAY_CSS;
+    const stage = document.createElement("div");
+    stage.className = "stage";
+    root.append(style, stage);
     (document.body || document.documentElement).appendChild(host);
-    return { host, stage: root.querySelector(".stage") };
+    return { host, stage };
   }
 
   function unmountOverlay(id) {
@@ -143,7 +150,7 @@
     wrap.className = "wrap";
     const disc = document.createElement("div");
     disc.className = "disc " + (ok ? "ok" : "bad");
-    disc.innerHTML = ok ? ICON_CHECK : ICON_X;
+    disc.appendChild(svgNode(ok ? ICON_CHECK : ICON_X));
     wrap.appendChild(disc);
     if (text) {
       const label = document.createElement("div");
@@ -197,11 +204,22 @@
     if (seconds === 0) return;
 
     const { host, stage } = mountOverlay("_fullpage-capture-countdown");
-    stage.innerHTML = '<div class="wrap"><div class="count"><svg viewBox="0 0 132 132">' +
-      '<circle class="track" cx="66" cy="66" r="62"/><circle class="arc" cx="66" cy="66" r="62" pathLength="1"/>' +
-      '</svg><div class="num"></div></div><div class="label">Esc to cancel</div></div>';
-    const num = stage.querySelector(".num");
-    const arc = stage.querySelector(".arc");
+    const wrap = document.createElement("div");
+    wrap.className = "wrap";
+    const count = document.createElement("div");
+    count.className = "count";
+    const ring = svgNode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 132 132">' +
+      '<circle class="track" cx="66" cy="66" r="62"/>' +
+      '<circle class="arc" cx="66" cy="66" r="62" pathLength="1"/></svg>');
+    const num = document.createElement("div");
+    num.className = "num";
+    const hint = document.createElement("div");
+    hint.className = "label";
+    hint.textContent = "Esc to cancel";
+    count.append(ring, num);
+    wrap.append(count, hint);
+    stage.appendChild(wrap);
+    const arc = ring.querySelector(".arc");
     const showCount = (n) => {
       num.textContent = n;
       replay(num);
